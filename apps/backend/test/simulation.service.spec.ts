@@ -45,6 +45,37 @@ const seasonalTemperature = (month: number) => {
   return 10 + seasonalSwing * -10;
 };
 
+const solarFactor = (hour: number) => {
+  const radians = ((hour - 6) / 12) * Math.PI;
+  return Math.max(0, Math.sin(radians));
+};
+
+const diurnalFactor = (assetType: AssetType, hour: number) => {
+  if (assetType === AssetType.HOME_EV_CHARGER) {
+    if (hour >= 18 && hour < 23) {
+      return 1.2;
+    }
+    if (hour >= 0 && hour < 6) {
+      return 0.3;
+    }
+    return 0.6;
+  }
+
+  if (assetType === AssetType.PUBLIC_EV_CHARGER) {
+    if (hour >= 8 && hour < 18) {
+      return 1.1;
+    }
+    return 0.5;
+  }
+
+  if (assetType === AssetType.BASE_LOAD) {
+    const radians = ((hour - 19) / 24) * Math.PI * 2;
+    return 0.7 + 0.3 * ((1 + Math.cos(radians)) / 2);
+  }
+
+  return 1;
+};
+
 describe('SimulationService weather impacts', () => {
   it('scales PV and heat pump output based on deterministic weather', () => {
     const service = new SimulationService();
@@ -53,6 +84,7 @@ describe('SimulationService weather impacts', () => {
 
     const step = result.steps[0];
     const month = new Date(input.clock.startDateTimeIso).getUTCMonth();
+    const hour = new Date(input.clock.startDateTimeIso).getUTCHours();
     const temperatureC = seasonalTemperature(month);
     const expectedIrradiance = irradianceFactor(month, temperatureC);
 
@@ -71,17 +103,34 @@ describe('SimulationService weather impacts', () => {
 
     const baseLoadKw = input.households
       .flatMap((household) => household.assets)
-      .filter((asset) => asset.type !== AssetType.PV && asset.type !== AssetType.HEAT_PUMP)
-      .reduce((sum, asset) => sum + asset.ratedKw, 0);
+      .filter((asset) => asset.type === AssetType.BASE_LOAD || asset.type === AssetType.HOME_EV_CHARGER)
+      .reduce((sum, asset) => sum + asset.ratedKw * diurnalFactor(asset.type, hour), 0);
 
-    const expectedPvKw = totalPvKw * expectedIrradiance;
+    const expectedPvKw = totalPvKw * expectedIrradiance * solarFactor(hour);
     const expectedHeatKw = totalHeatKw * demandFactor(temperatureC);
-    const publicLoadKw = input.publicChargers.reduce((sum, asset) => sum + asset.ratedKw, 0);
+    const publicLoadKw = input.publicChargers.reduce(
+      (sum, asset) => sum + asset.ratedKw * diurnalFactor(asset.type, hour),
+      0,
+    );
 
     expect(step.neighborhoodPvKw).toBeCloseTo(expectedPvKw, 5);
-    expect(step.neighborhoodLoadKw).toBeCloseTo(
-      baseLoadKw + expectedHeatKw + publicLoadKw,
+    expect(step.neighborhoodLoadKw).toBeCloseTo(baseLoadKw + expectedHeatKw + publicLoadKw, 5);
+    expect(step.baseLoadKw).toBeCloseTo(
+      input.households
+        .flatMap((household) => household.assets)
+        .filter((asset) => asset.type === AssetType.BASE_LOAD)
+        .reduce((sum, asset) => sum + asset.ratedKw * diurnalFactor(asset.type, hour), 0),
       5,
     );
+    expect(step.heatPumpKw).toBeCloseTo(expectedHeatKw, 5);
+    expect(step.homeEvKw).toBeCloseTo(
+      input.households
+        .flatMap((household) => household.assets)
+        .filter((asset) => asset.type === AssetType.HOME_EV_CHARGER)
+        .reduce((sum, asset) => sum + asset.ratedKw * diurnalFactor(asset.type, hour), 0),
+      5,
+    );
+    expect(step.publicEvKw).toBeCloseTo(publicLoadKw, 5);
+    expect(step.netLoadKw).toBeCloseTo(step.neighborhoodLoadKw - step.neighborhoodPvKw, 5);
   });
 });
