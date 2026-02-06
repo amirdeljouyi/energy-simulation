@@ -25,6 +25,12 @@ export type NeighborhoodConfig = {
   assetDistribution: AssetDistribution[];
   households: HouseholdInput[];
   publicChargers: AssetInput[];
+  battery: {
+    capacityKwh: number;
+    maxPowerKw: number;
+    roundTripEfficiency: number;
+    thresholdKw: number;
+  };
 };
 
 export type SimulationClock = {
@@ -38,6 +44,8 @@ export type SimulationTotals = {
   neighborhoodExportKwh: number;
   neighborhoodConsumptionKwh: number;
   neighborhoodPvKwh: number;
+  peakLoadKw: number;
+  peakLoadWithBatteryKw: number;
 };
 
 export type AssetTotals = {
@@ -77,6 +85,10 @@ export type SimulationStep = {
   heatPumpKw: number;
   homeEvKw: number;
   publicEvKw: number;
+  netLoadKw: number;
+  netLoadWithBatteryKw: number;
+  batteryPowerKw: number;
+  batterySocKwh: number;
   gridImportKw: number;
   gridExportKw: number;
   season: string;
