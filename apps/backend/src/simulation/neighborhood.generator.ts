@@ -20,6 +20,12 @@ type RawNeighborhoodConfig = {
     homeEvKw: number;
     publicEvKw: number;
   };
+  battery: {
+    capacityKwh: number;
+    maxPowerKw: number;
+    roundTripEfficiency: number;
+    thresholdKw: number;
+  };
 };
 
 const resolveConfigPath = () => {
@@ -35,6 +41,11 @@ const resolveConfigPath = () => {
 const loadConfig = (): RawNeighborhoodConfig => {
   const content = readFileSync(resolveConfigPath(), 'utf8');
   return JSON.parse(content) as RawNeighborhoodConfig;
+};
+
+const writeConfig = (config: RawNeighborhoodConfig): void => {
+  const filePath = resolveConfigPath();
+  writeFileSync(filePath, JSON.stringify(config, null, 2), 'utf8');
 };
 
 const mulberry32 = (seed: number) => {
@@ -160,12 +171,16 @@ export const generateNeighborhoodConfig = (): NeighborhoodConfig => {
     };
   });
 
-  const publicChargers: AssetConfig[] = Array.from({ length: config.publicChargerCount }, (_, index) => ({
-    id: `public-ev-${index + 1}`,
-    name: `Public Charger ${index + 1}`,
-    type: AssetType.PUBLIC_EV_CHARGER,
-    ratedKw: config.defaults.publicEvKw,
-  }));
+  const publicChargers: AssetConfig[] = Array.from({ length: config.publicChargerCount }, (_, index) => {
+    const variation = 0.7 + rand() * 0.6;
+    const ratedKw = Number((config.defaults.publicEvKw * variation).toFixed(2));
+    return {
+      id: `public-ev-${index + 1}`,
+      name: `Public Charger ${index + 1}`,
+      type: AssetType.PUBLIC_EV_CHARGER,
+      ratedKw,
+    };
+  });
 
   const neighborhoodConfig: NeighborhoodConfig = {
     seed: config.seed,
@@ -174,11 +189,56 @@ export const generateNeighborhoodConfig = (): NeighborhoodConfig => {
     assetDistribution: distribution,
     households,
     publicChargers,
+    battery: {
+      capacityKwh: config.battery.capacityKwh,
+      maxPowerKw: config.battery.maxPowerKw,
+      roundTripEfficiency: config.battery.roundTripEfficiency,
+      thresholdKw: config.battery.thresholdKw,
+    },
   };
 
   persistNeighborhoodConfig(neighborhoodConfig);
 
   return neighborhoodConfig;
+};
+
+export const updateNeighborhoodConfig = (update: {
+  seed?: number;
+  houseCount?: number;
+  publicChargerCount?: number;
+  assetDistribution?: { type: AssetType; share: number }[];
+  battery?: {
+    capacityKwh: number;
+    maxPowerKw: number;
+    roundTripEfficiency: number;
+    thresholdKw: number;
+  };
+}): NeighborhoodConfig => {
+  const current = loadConfig();
+
+  const next: RawNeighborhoodConfig = {
+    ...current,
+    seed: update.seed ?? current.seed,
+    houseCount: update.houseCount ?? current.houseCount,
+    publicChargerCount: update.publicChargerCount ?? current.publicChargerCount,
+    assetDistribution: update.assetDistribution
+      ? update.assetDistribution.reduce<Record<string, number>>((acc, entry) => {
+          acc[entry.type] = entry.share;
+          return acc;
+        }, {})
+      : current.assetDistribution,
+    battery: update.battery
+      ? {
+          capacityKwh: update.battery.capacityKwh,
+          maxPowerKw: update.battery.maxPowerKw,
+          roundTripEfficiency: update.battery.roundTripEfficiency,
+          thresholdKw: update.battery.thresholdKw,
+        }
+      : current.battery,
+  };
+
+  writeConfig(next);
+  return generateNeighborhoodConfig();
 };
 
 const persistNeighborhoodConfig = (config: NeighborhoodConfig): void => {

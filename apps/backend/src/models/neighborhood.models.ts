@@ -1,5 +1,6 @@
 import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
 import { AssetType } from './asset.models';
+import { BatteryConfig } from './battery.models';
 
 @ObjectType()
 export class AssetConfig {
@@ -59,4 +60,7 @@ export class NeighborhoodConfig {
 
   @Field(() => [AssetConfig])
   publicChargers!: AssetConfig[];
+
+  @Field(() => BatteryConfig)
+  battery!: BatteryConfig;
 }

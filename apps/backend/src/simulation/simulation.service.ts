@@ -12,7 +12,7 @@ import { AssetInput } from '../dto/asset-input.dto';
 import { SimulationInput } from '../dto/simulation-input.dto';
 import { HouseholdEnergyResult, HouseholdStepResult } from '../models/household.models';
 import { NeighborhoodConfig } from '../models/neighborhood.models';
-import { generateNeighborhoodConfig } from './neighborhood.generator';
+import { generateNeighborhoodConfig, updateNeighborhoodConfig } from './neighborhood.generator';
 
 interface AssetAccumulator {
   assetId: string;
@@ -27,6 +27,21 @@ type HouseholdAccumulator = HouseholdEnergyResult;
 export class SimulationService {
   getNeighborhoodConfig(): NeighborhoodConfig {
     return generateNeighborhoodConfig();
+  }
+
+  updateNeighborhoodConfig(update: {
+    seed?: number;
+    houseCount?: number;
+    publicChargerCount?: number;
+    assetDistribution?: { type: AssetType; share: number }[];
+    battery?: {
+      capacityKwh: number;
+      maxPowerKw: number;
+      roundTripEfficiency: number;
+      thresholdKw: number;
+    };
+  }): NeighborhoodConfig {
+    return updateNeighborhoodConfig(update);
   }
 
   runSimulation(input: SimulationInput): SimulationResult {
@@ -59,6 +74,17 @@ export class SimulationService {
     let neighborhoodExportKwh = 0;
     let neighborhoodConsumptionKwh = 0;
     let neighborhoodPvKwh = 0;
+    let peakLoadKw = 0;
+    let peakLoadWithBatteryKw = 0;
+    const neighborhoodConfig = this.getNeighborhoodConfig();
+    const batteryCapacityKwh = neighborhoodConfig.battery.capacityKwh;
+    const batteryMaxPowerKw = neighborhoodConfig.battery.maxPowerKw;
+    const batteryEfficiency = Math.min(
+      1,
+      Math.max(0.1, neighborhoodConfig.battery.roundTripEfficiency),
+    );
+    const batteryThresholdKw = neighborhoodConfig.battery.thresholdKw;
+    let batterySocKwh = batteryCapacityKwh * 0.5;
     const householdAccumulators: HouseholdAccumulator[] = households.map((household) => ({
       householdId: household.id,
       householdName: household.name,
@@ -77,34 +103,51 @@ export class SimulationService {
 
       let neighborhoodLoadKw = 0;
       let neighborhoodPvKw = 0;
+      let baseLoadKw = 0;
+      let heatPumpKw = 0;
+      let homeEvKw = 0;
       let gridImportKw = 0;
       let gridExportKw = 0;
 
       const householdResults: HouseholdStepResult[] = households.map((household, householdIndex) => {
-        const loadKw = this.sumAssetPower(
-          household.assets,
-          stepIndex,
-          false,
-          assetAccumulators,
-          stepHours,
-          weather,
-          timestampDate,
-        );
-        const pvKw = this.sumAssetPower(
-          household.assets,
-          stepIndex,
-          true,
-          assetAccumulators,
-          stepHours,
-          weather,
-          timestampDate,
-        );
+        let householdBaseKw = 0;
+        let householdHeatKw = 0;
+        let householdEvKw = 0;
+        let householdPvKw = 0;
+
+        household.assets.forEach((asset) => {
+          const kw = this.computeAssetKw(
+            asset,
+            stepIndex,
+            stepHours,
+            weather,
+            timestampDate,
+            assetAccumulators,
+          );
+          if (asset.type === AssetType.PV) {
+            householdPvKw += kw;
+          } else if (asset.type === AssetType.BASE_LOAD) {
+            householdBaseKw += kw;
+          } else if (asset.type === AssetType.HEAT_PUMP) {
+            householdHeatKw += kw;
+          } else if (asset.type === AssetType.HOME_EV_CHARGER) {
+            householdEvKw += kw;
+          } else {
+            householdBaseKw += kw;
+          }
+        });
+
+        const loadKw = householdBaseKw + householdHeatKw + householdEvKw;
+        const pvKw = householdPvKw;
 
         const netLoadKw = Math.max(loadKw - pvKw, 0);
         const exportKw = Math.max(pvKw - loadKw, 0);
 
         neighborhoodLoadKw += loadKw;
         neighborhoodPvKw += pvKw;
+        baseLoadKw += householdBaseKw;
+        heatPumpKw += householdHeatKw;
+        homeEvKw += householdEvKw;
         gridImportKw += netLoadKw;
         gridExportKw += exportKw;
 
@@ -117,6 +160,9 @@ export class SimulationService {
         return {
           householdId: household.id,
           householdName: household.name,
+          baseLoadKw: householdBaseKw,
+          heatPumpKw: householdHeatKw,
+          homeEvKw: householdEvKw,
           loadKw,
           pvKw,
           netLoadKw,
@@ -124,20 +170,42 @@ export class SimulationService {
         };
       });
 
-      const publicLoadKw = this.sumAssetPower(
-        publicChargers,
-        stepIndex,
-        false,
-        assetAccumulators,
-        stepHours,
-        weather,
-        timestampDate,
-      );
+      const publicLoadKw = publicChargers.reduce((total, asset) => {
+        const kw = this.computeAssetKw(
+          asset,
+          stepIndex,
+          stepHours,
+          weather,
+          timestampDate,
+          assetAccumulators,
+        );
+        return total + kw;
+      }, 0);
       neighborhoodLoadKw += publicLoadKw;
       gridImportKw += publicLoadKw;
 
-      const stepImportKwh = gridImportKw * stepHours;
-      const stepExportKwh = gridExportKw * stepHours;
+      const netLoadKw = neighborhoodLoadKw - neighborhoodPvKw;
+      peakLoadKw = Math.max(peakLoadKw, netLoadKw);
+
+      const batteryDispatch = this.dispatchBattery({
+        netLoadKw,
+        batterySocKwh,
+        batteryCapacityKwh,
+        batteryMaxPowerKw,
+        batteryEfficiency,
+        thresholdKw: batteryThresholdKw,
+        stepHours,
+      });
+
+      batterySocKwh = batteryDispatch.nextSocKwh;
+      const netLoadWithBatteryKw = netLoadKw - batteryDispatch.batteryPowerKw;
+      peakLoadWithBatteryKw = Math.max(peakLoadWithBatteryKw, netLoadWithBatteryKw);
+
+      const adjustedImportKw = Math.max(netLoadWithBatteryKw, 0);
+      const adjustedExportKw = Math.max(-netLoadWithBatteryKw, 0);
+
+      const stepImportKwh = adjustedImportKw * stepHours;
+      const stepExportKwh = adjustedExportKw * stepHours;
       const stepConsumptionKwh = neighborhoodLoadKw * stepHours;
       const stepPvKwh = neighborhoodPvKw * stepHours;
 
@@ -151,8 +219,16 @@ export class SimulationService {
         timestampIso,
         neighborhoodLoadKw,
         neighborhoodPvKw,
-        gridImportKw,
-        gridExportKw,
+        baseLoadKw,
+        heatPumpKw,
+        homeEvKw,
+        publicEvKw: publicLoadKw,
+        netLoadKw,
+        netLoadWithBatteryKw,
+        batteryPowerKw: batteryDispatch.batteryPowerKw,
+        batterySocKwh,
+        gridImportKw: adjustedImportKw,
+        gridExportKw: adjustedExportKw,
         season: weather.season,
         temperatureC: weather.temperatureC,
         irradianceFactor: weather.irradianceFactor,
@@ -165,6 +241,8 @@ export class SimulationService {
       neighborhoodExportKwh,
       neighborhoodConsumptionKwh,
       neighborhoodPvKwh,
+      peakLoadKw,
+      peakLoadWithBatteryKw,
     };
 
     const result: SimulationResult = {
@@ -202,42 +280,33 @@ export class SimulationService {
     writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
   }
 
-  private sumAssetPower(
-    assets: AssetInput[],
+  private computeAssetKw(
+    asset: AssetInput,
     stepIndex: number,
-    includePv: boolean,
-    accumulators: Map<string, AssetAccumulator>,
     stepHours: number,
     weather?: { temperatureC: number; irradianceFactor: number },
     timestamp?: Date,
+    accumulators?: Map<string, AssetAccumulator>,
   ): number {
-    return assets.reduce((total, asset) => {
-      const isPv = asset.type === AssetType.PV;
-      if (includePv !== isPv) {
-        return total;
+    if (asset.profileKw && asset.profileKw.length > 0) {
+      const baseKw = asset.profileKw[stepIndex] ?? asset.ratedKw;
+      const kw = this.applyWeather(asset.type, baseKw, weather, timestamp);
+      if (accumulators) {
+        const accumulator = accumulators.get(asset.id);
+        if (accumulator) {
+          accumulator.cumulativeKwh += kw * stepHours;
+        }
       }
-
-      const kw = this.resolveAssetKw(asset, stepIndex, weather, timestamp);
+      return kw;
+    }
+    const kw = this.applyWeather(asset.type, asset.ratedKw, weather, timestamp);
+    if (accumulators) {
       const accumulator = accumulators.get(asset.id);
       if (accumulator) {
         accumulator.cumulativeKwh += kw * stepHours;
       }
-
-      return total + kw;
-    }, 0);
-  }
-
-  private resolveAssetKw(
-    asset: AssetInput,
-    stepIndex: number,
-    weather?: { temperatureC: number; irradianceFactor: number },
-    timestamp?: Date,
-  ): number {
-    if (asset.profileKw && asset.profileKw.length > 0) {
-      const baseKw = asset.profileKw[stepIndex] ?? asset.ratedKw;
-      return this.applyWeather(asset.type, baseKw, weather, timestamp);
     }
-    return this.applyWeather(asset.type, asset.ratedKw, weather, timestamp);
+    return kw;
   }
 
   private applyWeather(
@@ -338,6 +407,48 @@ export class SimulationService {
     return 1;
   }
 
+  private dispatchBattery(params: {
+    netLoadKw: number;
+    batterySocKwh: number;
+    batteryCapacityKwh: number;
+    batteryMaxPowerKw: number;
+    batteryEfficiency: number;
+    thresholdKw: number;
+    stepHours: number;
+  }): { batteryPowerKw: number; nextSocKwh: number } {
+    const {
+      netLoadKw,
+      batterySocKwh,
+      batteryCapacityKwh,
+      batteryMaxPowerKw,
+      batteryEfficiency,
+      thresholdKw,
+      stepHours,
+    } = params;
+
+    const chargeTargetKw = thresholdKw * 0.6;
+    let batteryPowerKw = 0;
+    let nextSocKwh = batterySocKwh;
+
+    if (netLoadKw > thresholdKw && batterySocKwh > 0) {
+      const desiredDischargeKw = Math.min(batteryMaxPowerKw, netLoadKw - thresholdKw);
+      const availableKwh = batterySocKwh * batteryEfficiency;
+      const maxDischargeKw = availableKwh / stepHours;
+      batteryPowerKw = Math.min(desiredDischargeKw, maxDischargeKw);
+      const energyOutKwh = batteryPowerKw * stepHours;
+      nextSocKwh = Math.max(0, batterySocKwh - energyOutKwh / batteryEfficiency);
+    } else if (netLoadKw < chargeTargetKw && batterySocKwh < batteryCapacityKwh) {
+      const desiredChargeKw = Math.min(batteryMaxPowerKw, chargeTargetKw - netLoadKw);
+      const availableCapacityKwh = batteryCapacityKwh - batterySocKwh;
+      const maxChargeKw = availableCapacityKwh / (stepHours * batteryEfficiency);
+      batteryPowerKw = -Math.min(desiredChargeKw, maxChargeKw);
+      const energyInKwh = Math.abs(batteryPowerKw) * stepHours;
+      nextSocKwh = Math.min(batteryCapacityKwh, batterySocKwh + energyInKwh * batteryEfficiency);
+    }
+
+    return { batteryPowerKw, nextSocKwh };
+  }
+
   private validateInput(input: SimulationInput): void {
     if (input.clock.stepMinutes <= 0) {
       throw new BadRequestException('stepMinutes must be greater than zero');
@@ -372,12 +483,17 @@ export class SimulationService {
       }
     });
 
-    if (input.households.length !== 30) {
-      throw new BadRequestException('households must include 30 entries');
+    const config = this.getNeighborhoodConfig();
+    if (input.households.length !== config.houseCount) {
+      throw new BadRequestException(
+        `households must include ${config.houseCount} entries`,
+      );
     }
 
-    if (input.publicChargers.length !== 6) {
-      throw new BadRequestException('publicChargers must include 6 assets');
+    if (input.publicChargers.length !== config.publicChargerCount) {
+      throw new BadRequestException(
+        `publicChargers must include ${config.publicChargerCount} assets`,
+      );
     }
 
     input.publicChargers.forEach((asset) => {

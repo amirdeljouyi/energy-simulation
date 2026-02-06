@@ -3,6 +3,7 @@ import { SimulationResult } from '../models/simulation.models';
 import { SimulationInput } from '../dto/simulation-input.dto';
 import { SimulationService } from './simulation.service';
 import { NeighborhoodConfig } from '../models/neighborhood.models';
+import { NeighborhoodConfigInput } from '../dto/neighborhood-config-input.dto';
 
 @Resolver(() => SimulationResult)
 export class SimulationResolver {
@@ -11,6 +12,13 @@ export class SimulationResolver {
   @Query(() => NeighborhoodConfig)
   neighborhoodConfig(): NeighborhoodConfig {
     return this.simulationService.getNeighborhoodConfig();
+  }
+
+  @Mutation(() => NeighborhoodConfig)
+  updateNeighborhoodConfig(
+    @Args('input') input: NeighborhoodConfigInput,
+  ): NeighborhoodConfig {
+    return this.simulationService.updateNeighborhoodConfig(input);
   }
 
   @Mutation(() => SimulationResult)

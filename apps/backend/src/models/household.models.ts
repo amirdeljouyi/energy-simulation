@@ -9,6 +9,15 @@ export class HouseholdStepResult {
   householdName!: string;
 
   @Field(() => Float)
+  baseLoadKw!: number;
+
+  @Field(() => Float)
+  heatPumpKw!: number;
+
+  @Field(() => Float)
+  homeEvKw!: number;
+
+  @Field(() => Float)
   loadKw!: number;
 
   @Field(() => Float)

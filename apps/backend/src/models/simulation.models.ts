@@ -53,6 +53,30 @@ export class SimulationStepResult {
   neighborhoodPvKw!: number;
 
   @Field(() => Float)
+  baseLoadKw!: number;
+
+  @Field(() => Float)
+  heatPumpKw!: number;
+
+  @Field(() => Float)
+  homeEvKw!: number;
+
+  @Field(() => Float)
+  publicEvKw!: number;
+
+  @Field(() => Float)
+  netLoadKw!: number;
+
+  @Field(() => Float)
+  netLoadWithBatteryKw!: number;
+
+  @Field(() => Float)
+  batteryPowerKw!: number;
+
+  @Field(() => Float)
+  batterySocKwh!: number;
+
+  @Field(() => Float)
   gridImportKw!: number;
 
   @Field(() => Float)
@@ -84,6 +108,12 @@ export class SimulationTotals {
 
   @Field(() => Float)
   neighborhoodPvKwh!: number;
+
+  @Field(() => Float)
+  peakLoadKw!: number;
+
+  @Field(() => Float)
+  peakLoadWithBatteryKw!: number;
 }
 
 @ObjectType()
