@@ -29,9 +29,14 @@ export const baseHouseholds: HouseholdInput[] = [
   },
 ];
 
-export const publicChargers: AssetInput[] = Array.from({ length: 6 }, (_, index) => ({
-  id: `public-ev-${index + 1}`,
-  name: `Public Charger ${index + 1}`,
-  type: 'PUBLIC_EV_CHARGER',
-  ratedKw: 7.2,
-}));
+const publicChargerVariations = [0.8, 0.95, 1.1, 0.75, 1.2, 0.9];
+
+export const publicChargers: AssetInput[] = Array.from({ length: 6 }, (_, index) => {
+  const variation = publicChargerVariations[index] ?? 1;
+  return {
+    id: `public-ev-${index + 1}`,
+    name: `Public Charger ${index + 1}`,
+    type: 'PUBLIC_EV_CHARGER',
+    ratedKw: Number((7.2 * variation).toFixed(2)),
+  };
+});
