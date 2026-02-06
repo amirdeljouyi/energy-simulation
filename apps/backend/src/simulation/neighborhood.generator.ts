@@ -242,7 +242,7 @@ export const updateNeighborhoodConfig = (update: {
 };
 
 const persistNeighborhoodConfig = (config: NeighborhoodConfig): void => {
-  const outputDir = join(process.cwd(), 'apps/backend/output');
+  const outputDir = join(process.cwd(), 'output');
   mkdirSync(outputDir, { recursive: true });
 
   const filename = `neighborhood-${Date.now()}.json`;

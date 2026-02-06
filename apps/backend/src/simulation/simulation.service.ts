@@ -259,7 +259,7 @@ export class SimulationService {
   }
 
   private persistResults(result: SimulationResult): void {
-    const outputDir = join(process.cwd(), 'apps/backend/output');
+    const outputDir = join(process.cwd(), 'output');
     mkdirSync(outputDir, { recursive: true });
 
     const publicAssetTotals = result.assetTotals.filter(

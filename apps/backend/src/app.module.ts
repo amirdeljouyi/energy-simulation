@@ -9,7 +9,7 @@ import { SimulationModule } from './simulation/simulation.module';
   imports: [
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
-      autoSchemaFile: join(process.cwd(), 'apps/backend/src/schema.gql'),
+      autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
       playground: true,
     }),
     SimulationModule,
