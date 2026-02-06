@@ -1,0 +1,111 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type HouseholdStepResult {
+  householdId: String!
+  householdName: String!
+  loadKw: Float!
+  pvKw: Float!
+  netLoadKw: Float!
+  exportKw: Float!
+}
+
+type HouseholdEnergyResult {
+  householdId: String!
+  householdName: String!
+  loadKwh: Float!
+  pvKwh: Float!
+  netLoadKwh: Float!
+  exportKwh: Float!
+}
+
+type SimulationClock {
+  startDateTimeIso: String!
+  stepMinutes: Int!
+  steps: Int!
+}
+
+type AssetEnergyResult {
+  assetId: String!
+  type: AssetType!
+  name: String
+  cumulativeKwh: Float!
+}
+
+enum AssetType {
+  BASE_LOAD
+  HEAT_PUMP
+  PV
+  HOME_EV_CHARGER
+  PUBLIC_EV_CHARGER
+}
+
+type SimulationStepResult {
+  stepIndex: Int!
+  timestampIso: String!
+  neighborhoodLoadKw: Float!
+  neighborhoodPvKw: Float!
+  gridImportKw: Float!
+  gridExportKw: Float!
+  season: Season!
+  temperatureC: Float!
+  irradianceFactor: Float!
+  householdResults: [HouseholdStepResult!]!
+}
+
+enum Season {
+  WINTER
+  SPRING
+  SUMMER
+  AUTUMN
+}
+
+type SimulationTotals {
+  neighborhoodImportKwh: Float!
+  neighborhoodExportKwh: Float!
+  neighborhoodConsumptionKwh: Float!
+  neighborhoodPvKwh: Float!
+}
+
+type SimulationResult {
+  clock: SimulationClock!
+  steps: [SimulationStepResult!]!
+  householdTotals: [HouseholdEnergyResult!]!
+  assetTotals: [AssetEnergyResult!]!
+  totals: SimulationTotals!
+}
+
+type Query {
+  health: String!
+}
+
+type Mutation {
+  runSimulation(input: SimulationInput!): SimulationResult!
+}
+
+input SimulationInput {
+  clock: SimulationClockInput!
+  households: [HouseholdInput!]!
+  publicChargers: [AssetInput!]!
+}
+
+input SimulationClockInput {
+  startDateTimeIso: String!
+  stepMinutes: Int!
+  steps: Int!
+}
+
+input HouseholdInput {
+  id: String!
+  name: String!
+  assets: [AssetInput!]!
+}
+
+input AssetInput {
+  id: String!
+  name: String
+  type: AssetType!
+  ratedKw: Float!
+  profileKw: [Float!]
+}
