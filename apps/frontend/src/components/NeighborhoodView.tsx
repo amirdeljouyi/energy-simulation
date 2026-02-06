@@ -45,6 +45,10 @@ type NeighborhoodViewProps = {
   startDateTime: string;
   endDateTime: string;
   stepMinutes: number;
+  batteryCapacityKwh: number;
+  batteryMaxPowerKw: number;
+  batteryEfficiency: number;
+  batteryThresholdKw: number;
   onStartDateTimeChange: (value: string) => void;
   onEndDateTimeChange: (value: string) => void;
   onStepMinutesChange: (value: number) => void;
@@ -68,6 +72,7 @@ const chartOptions = [
   { id: 'daily', label: 'Daily energy consumption vs generation' },
   { id: 'top', label: 'Top households by energy usage' },
   { id: 'share', label: 'Energy share by asset type' },
+  { id: 'battery', label: 'Battery impact and state-of-charge' },
 ] as const;
 
 type ChartOption = (typeof chartOptions)[number]['id'];
@@ -79,6 +84,10 @@ export default function NeighborhoodView({
   startDateTime,
   endDateTime,
   stepMinutes,
+  batteryCapacityKwh,
+  batteryMaxPowerKw,
+  batteryEfficiency,
+  batteryThresholdKw,
   onStartDateTimeChange,
   onEndDateTimeChange,
   onStepMinutesChange,
@@ -217,6 +226,67 @@ export default function NeighborhoodView({
       );
     }
 
+    if (chartSelection === 'battery') {
+      const series = [
+        {
+          name: 'Net load (no battery)',
+          data: last24Steps.map((step) => ({
+            x: new Date(step.timestampIso).getTime(),
+            y: step.netLoadKw,
+          })),
+        },
+        {
+          name: 'Net load (with battery)',
+          data: last24Steps.map((step) => ({
+            x: new Date(step.timestampIso).getTime(),
+            y: step.netLoadWithBatteryKw,
+          })),
+        },
+        {
+          name: 'Battery power',
+          data: last24Steps.map((step) => ({
+            x: new Date(step.timestampIso).getTime(),
+            y: step.batteryPowerKw,
+          })),
+        },
+        {
+          name: 'Battery SOC',
+          data: last24Steps.map((step) => ({
+            x: new Date(step.timestampIso).getTime(),
+            y: step.batterySocKwh,
+          })),
+        },
+      ];
+
+      const options: ApexOptions = {
+        ...chartOptionsBase,
+        chart: { ...chartOptionsBase.chart, type: 'line' },
+        stroke: { curve: 'smooth', width: 3 },
+        xaxis: { type: 'datetime' },
+        yaxis: [
+          {
+            title: { text: 'Power (kW)' },
+            labels: { formatter: (value) => `${value.toFixed(1)} kW` },
+          },
+          {
+            opposite: true,
+            title: { text: 'SOC (kWh)' },
+            labels: { formatter: (value) => `${value.toFixed(0)} kWh` },
+          },
+        ],
+        tooltip: { y: { formatter: (value) => `${value.toFixed(2)}` } },
+      };
+
+      const mappedSeries = [
+        { ...series[0], type: 'line' },
+        { ...series[1], type: 'line' },
+        { ...series[2], type: 'column' },
+        { ...series[3], type: 'line', yAxisIndex: 1 },
+      ];
+
+      return <ChartRenderer options={options} series={mappedSeries} type="line" height={320} />;
+    }
+
     const stepHours = stepMinutes / 60;
     const totals = simData.steps.reduce(
       (acc, step) => {
@@ -270,6 +340,40 @@ export default function NeighborhoodView({
       </section>
 
       {simData && (
+        <ChartCard
+          title="Neighbourhood battery"
+          subtitle="Peak shaving configuration"
+        >
+          <div className="grid gap-3 text-sm text-slate-600 md:grid-cols-2">
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <span>Capacity</span>
+              <span className="font-semibold text-slate-900">
+                {batteryCapacityKwh.toFixed(0)} kWh
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <span>Max power</span>
+              <span className="font-semibold text-slate-900">
+                {batteryMaxPowerKw.toFixed(0)} kW
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <span>Round-trip efficiency</span>
+              <span className="font-semibold text-slate-900">
+                {(batteryEfficiency * 100).toFixed(0)}%
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <span>Shave threshold</span>
+              <span className="font-semibold text-slate-900">
+                {batteryThresholdKw.toFixed(0)} kW
+              </span>
+            </div>
+          </div>
+        </ChartCard>
+      )}
+
+      {simData && (
         <>
           <SimulationPlaybackPanel
             step={simData.steps[currentStepIndex] ?? null}
@@ -317,6 +421,22 @@ export default function NeighborhoodView({
             }
           >
             {renderChart()}
+            {chartSelection === 'battery' && totals && (
+              <div className="mt-6 grid gap-3 text-sm text-slate-600 md:grid-cols-2">
+                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <span>Peak without battery</span>
+                  <span className="font-semibold text-slate-900">
+                    {totals.peakLoadKw.toFixed(1)} kW
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <span>Peak with battery</span>
+                  <span className="font-semibold text-slate-900">
+                    {totals.peakLoadWithBatteryKw.toFixed(1)} kW
+                  </span>
+                </div>
+              </div>
+            )}
           </ChartCard>
 
           <HouseholdTotalsTable totals={simData.householdTotals} />
