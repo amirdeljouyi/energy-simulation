@@ -1,12 +1,9 @@
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
-import AssetTotalsTable from './components/AssetTotalsTable';
-import AssetsPanel from './components/AssetsPanel';
-import HouseholdTotalsTable from './components/HouseholdTotalsTable';
-import Last24HoursChart from './components/Last24HoursChart';
-import SimulationClockPanel from './components/SimulationClockPanel';
+import DashboardViewToggle from './components/DashboardViewToggle';
+import HouseholdView from './components/HouseholdView';
+import NeighborhoodView from './components/NeighborhoodView';
 import SimulationHeader from './components/SimulationHeader';
-import SimulationPlaybackPanel from './components/SimulationPlaybackPanel';
 import { baseHouseholds, publicChargers } from './data/simulationDefaults';
 import { NeighborhoodConfig, SimulationResult } from './types/simulation';
 
@@ -21,8 +18,8 @@ const RUN_SIMULATION = gql`
     runSimulation(input: $input) {
       clock {
         startDateTimeIso
+        endDateTimeIso
         stepMinutes
-        steps
       }
       steps {
         stepIndex
@@ -34,6 +31,14 @@ const RUN_SIMULATION = gql`
         season
         temperatureC
         irradianceFactor
+        householdResults {
+          householdId
+          householdName
+          loadKw
+          pvKw
+          netLoadKw
+          exportKw
+        }
       }
       householdTotals {
         householdId
@@ -112,7 +117,12 @@ export default function App() {
     useMutation<RunSimulationResult>(RUN_SIMULATION);
 
   const [stepMinutes, setStepMinutes] = useState(15);
-  const [steps, setSteps] = useState(96);
+  const [endDateTime, setEndDateTime] = useState(() => {
+    const end = new Date();
+    end.setSeconds(0, 0);
+    end.setHours(end.getHours() + 24);
+    return end.toISOString().slice(0, 16);
+  });
   const [startDateTime, setStartDateTime] = useState(() => {
     const now = new Date();
     now.setSeconds(0, 0);
@@ -122,26 +132,57 @@ export default function App() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [speedMs, setSpeedMs] = useState(defaultSpeedMs);
+  const [view, setView] = useState<'neighborhood' | 'household'>('neighborhood');
+  const [selectedHouseholdId, setSelectedHouseholdId] = useState<string | null>(null);
 
-  const households = configData?.neighborhoodConfig.households ?? baseHouseholds;
-  const chargers = configData?.neighborhoodConfig.publicChargers ?? publicChargers;
+  const households = useMemo(() => {
+    const source = configData?.neighborhoodConfig.households ?? baseHouseholds;
+    return source.map((household) => ({
+      id: household.id,
+      name: household.name,
+      assets: household.assets.map((asset) => ({
+        id: asset.id,
+        name: asset.name,
+        type: asset.type,
+        ratedKw: asset.ratedKw,
+        profileKw: asset.profileKw,
+      })),
+    }));
+  }, [configData]);
+
+  const chargers = useMemo(() => {
+    const source = configData?.neighborhoodConfig.publicChargers ?? publicChargers;
+    return source.map((asset) => ({
+      id: asset.id,
+      name: asset.name,
+      type: asset.type,
+      ratedKw: asset.ratedKw,
+      profileKw: asset.profileKw,
+    }));
+  }, [configData]);
 
   const simulationInput = useMemo(() => {
     const startDateTimeIso = new Date(startDateTime).toISOString();
     return {
       clock: {
         startDateTimeIso,
+        endDateTimeIso: new Date(endDateTime).toISOString(),
         stepMinutes: Number(stepMinutes),
-        steps: Number(steps),
       },
       households,
       publicChargers: chargers,
     };
-  }, [startDateTime, stepMinutes, steps, households, chargers]);
+  }, [startDateTime, endDateTime, stepMinutes, households, chargers]);
 
   useEffect(() => {
     setCurrentStepIndex(0);
-  }, [simData?.runSimulation.clock.startDateTimeIso, simData?.runSimulation.clock.steps]);
+  }, [simData?.runSimulation.clock.startDateTimeIso, simData?.runSimulation.clock.endDateTimeIso]);
+
+  useEffect(() => {
+    if (!selectedHouseholdId && households.length > 0) {
+      setSelectedHouseholdId(households[0].id);
+    }
+  }, [households, selectedHouseholdId]);
 
   useEffect(() => {
     if (!simData?.runSimulation.steps.length || !isPlaying) {
@@ -165,8 +206,6 @@ export default function App() {
   const totals = simData?.runSimulation.totals ?? null;
   const healthStatus = healthLoading ? 'checking' : healthError ? 'offline' : healthData?.health ?? 'n/a';
 
-  const playbackStep = simData?.runSimulation.steps[currentStepIndex] ?? null;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-amber-50 px-6 py-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-8">
@@ -175,44 +214,45 @@ export default function App() {
           subtitle="Adjust the simulation clock, review configured assets, and run a deterministic neighborhood simulation."
         />
 
-        <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <SimulationClockPanel
+        <DashboardViewToggle view={view} onChange={setView} />
+
+        {view === 'neighborhood' && (
+          <NeighborhoodView
             healthStatus={healthStatus}
             startDateTime={startDateTime}
+            endDateTime={endDateTime}
             stepMinutes={stepMinutes}
-            steps={steps}
             onStartDateTimeChange={setStartDateTime}
+            onEndDateTimeChange={setEndDateTime}
             onStepMinutesChange={setStepMinutes}
-            onStepsChange={setSteps}
             onRunSimulation={() => runSimulation({ variables: { input: simulationInput } })}
             simLoading={simLoading}
             simError={simError?.message}
             latestStep={latestStep}
             totals={totals}
+            households={households}
+            publicChargers={chargers}
+            simData={simData?.runSimulation ?? null}
+            isPlaying={isPlaying}
+            speedMs={speedMs}
+            onTogglePlay={() => setIsPlaying((prev) => !prev)}
+            onSpeedChange={setSpeedMs}
+            currentStepIndex={currentStepIndex}
           />
+        )}
 
-          <AssetsPanel households={households} publicChargers={chargers} />
-        </section>
-
-        {simData && (
-          <>
-            <SimulationPlaybackPanel
-              step={playbackStep}
-              isPlaying={isPlaying}
-              speedMs={speedMs}
-              onTogglePlay={() => setIsPlaying((prev) => !prev)}
-              onSpeedChange={setSpeedMs}
-              currentIndex={currentStepIndex}
-              totalSteps={simData.runSimulation.steps.length}
-            />
-            <Last24HoursChart
-              steps={simData.runSimulation.steps}
-              currentIndex={currentStepIndex}
-              stepMinutes={simData.runSimulation.clock.stepMinutes}
-            />
-            <HouseholdTotalsTable totals={simData.runSimulation.householdTotals} />
-            <AssetTotalsTable totals={simData.runSimulation.assetTotals} />
-          </>
+        {view === 'household' && (
+          <HouseholdView
+            households={households}
+            selectedHouseholdId={selectedHouseholdId}
+            onSelectHousehold={setSelectedHouseholdId}
+            simData={simData?.runSimulation ?? null}
+            currentStepIndex={currentStepIndex}
+            isPlaying={isPlaying}
+            speedMs={speedMs}
+            onTogglePlay={() => setIsPlaying((prev) => !prev)}
+            onSpeedChange={setSpeedMs}
+          />
         )}
       </div>
     </div>

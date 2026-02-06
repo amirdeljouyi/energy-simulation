@@ -5,11 +5,11 @@ const formatKwh = (value: number) => value.toFixed(1);
 type SimulationClockPanelProps = {
   healthStatus: string;
   startDateTime: string;
+  endDateTime: string;
   stepMinutes: number;
-  steps: number;
   onStartDateTimeChange: (value: string) => void;
+  onEndDateTimeChange: (value: string) => void;
   onStepMinutesChange: (value: number) => void;
-  onStepsChange: (value: number) => void;
   onRunSimulation: () => void;
   simLoading: boolean;
   simError?: string;
@@ -20,11 +20,11 @@ type SimulationClockPanelProps = {
 export default function SimulationClockPanel({
   healthStatus,
   startDateTime,
+  endDateTime,
   stepMinutes,
-  steps,
   onStartDateTimeChange,
+  onEndDateTimeChange,
   onStepMinutesChange,
-  onStepsChange,
   onRunSimulation,
   simLoading,
   simError,
@@ -58,22 +58,21 @@ export default function SimulationClockPanel({
           />
         </label>
         <label className="flex flex-col gap-2 text-sm text-slate-600">
+          End date/time
+          <input
+            type="datetime-local"
+            value={endDateTime}
+            onChange={(event) => onEndDateTimeChange(event.target.value)}
+            className="rounded-xl border border-slate-200 px-3 py-2 text-slate-900 shadow-sm"
+          />
+        </label>
+        <label className="flex flex-col gap-2 text-sm text-slate-600">
           Step size (minutes)
           <input
             type="number"
             min={1}
             value={stepMinutes}
             onChange={(event) => onStepMinutesChange(Number(event.target.value))}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-slate-900 shadow-sm"
-          />
-        </label>
-        <label className="flex flex-col gap-2 text-sm text-slate-600">
-          Steps
-          <input
-            type="number"
-            min={1}
-            value={steps}
-            onChange={(event) => onStepsChange(Number(event.target.value))}
             className="rounded-xl border border-slate-200 px-3 py-2 text-slate-900 shadow-sm"
           />
         </label>

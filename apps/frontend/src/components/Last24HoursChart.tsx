@@ -6,14 +6,26 @@ type Last24HoursChartProps = {
   steps: SimulationStep[];
   currentIndex: number;
   stepMinutes: number;
+  title: string;
+  subtitle: string;
+  valueAccessor: (step: SimulationStep) => number;
+  currentLabel?: string;
 };
 
-export default function Last24HoursChart({ steps, currentIndex, stepMinutes }: Last24HoursChartProps) {
+export default function Last24HoursChart({
+  steps,
+  currentIndex,
+  stepMinutes,
+  title,
+  subtitle,
+  valueAccessor,
+  currentLabel,
+}: Last24HoursChartProps) {
   const stepsPerDay = Math.max(1, Math.round((24 * 60) / stepMinutes));
   const startIndex = Math.max(0, currentIndex - stepsPerDay + 1);
   const windowSteps = steps.slice(startIndex, currentIndex + 1);
 
-  const values = windowSteps.map((step) => step.neighborhoodLoadKw - step.neighborhoodPvKw);
+  const values = windowSteps.map((step) => valueAccessor(step));
   const maxValue = Math.max(0.1, ...values.map((value) => Math.abs(value)));
 
   const width = 640;
@@ -24,7 +36,7 @@ export default function Last24HoursChart({ steps, currentIndex, stepMinutes }: L
     .map((step, index) => {
       const x =
         padding + (index / Math.max(1, windowSteps.length - 1)) * (width - padding * 2);
-      const normalized = (step.neighborhoodLoadKw - step.neighborhoodPvKw) / maxValue;
+      const normalized = valueAccessor(step) / maxValue;
       const y = height / 2 - normalized * ((height - padding * 2) / 2);
       return `${x},${y}`;
     })
@@ -36,13 +48,11 @@ export default function Last24HoursChart({ steps, currentIndex, stepMinutes }: L
     <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/60">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-slate-900">Last 24 hours (net load)</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Net load = neighborhood load minus PV generation.
-          </p>
+          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+          <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
         </div>
         <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs uppercase tracking-[0.2em] text-slate-600">
-          Current: {formatKw(latestValue)} kW
+          {currentLabel ?? 'Current'}: {formatKw(latestValue)} kW
         </div>
       </div>
       <div className="mt-6 overflow-x-auto">

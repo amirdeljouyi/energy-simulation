@@ -29,8 +29,8 @@ export type NeighborhoodConfig = {
 
 export type SimulationClock = {
   startDateTimeIso: string;
+  endDateTimeIso: string;
   stepMinutes: number;
-  steps: number;
 };
 
 export type SimulationTotals = {
@@ -56,6 +56,15 @@ export type HouseholdTotals = {
   exportKwh: number;
 };
 
+export type HouseholdStepResult = {
+  householdId: string;
+  householdName: string;
+  loadKw: number;
+  pvKw: number;
+  netLoadKw: number;
+  exportKw: number;
+};
+
 export type SimulationStep = {
   stepIndex: number;
   timestampIso: string;
@@ -66,6 +75,7 @@ export type SimulationStep = {
   season: string;
   temperatureC: number;
   irradianceFactor: number;
+  householdResults: HouseholdStepResult[];
 };
 
 export type SimulationResult = {
