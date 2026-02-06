@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import DashboardViewToggle from './components/DashboardViewToggle';
 import HouseholdView from './components/HouseholdView';
 import NeighborhoodView from './components/NeighborhoodView';
+import NeighborhoodConfigView from './components/NeighborhoodConfigView';
 import PublicChargersView from './components/PublicChargersView';
 import SimulationHeader from './components/SimulationHeader';
 import { baseHouseholds, publicChargers } from './data/simulationDefaults';
@@ -31,6 +32,10 @@ const RUN_SIMULATION = gql`
         heatPumpKw
         homeEvKw
         publicEvKw
+        netLoadKw
+        netLoadWithBatteryKw
+        batteryPowerKw
+        batterySocKwh
         gridImportKw
         gridExportKw
         season
@@ -67,6 +72,8 @@ const RUN_SIMULATION = gql`
         neighborhoodExportKwh
         neighborhoodConsumptionKwh
         neighborhoodPvKwh
+        peakLoadKw
+        peakLoadWithBatteryKw
       }
     }
   }
@@ -78,6 +85,12 @@ const NEIGHBORHOOD_CONFIG = gql`
       seed
       houseCount
       publicChargerCount
+      battery {
+        capacityKwh
+        maxPowerKw
+        roundTripEfficiency
+        thresholdKw
+      }
       assetDistribution {
         type
         share
@@ -103,6 +116,27 @@ const NEIGHBORHOOD_CONFIG = gql`
   }
 `;
 
+const UPDATE_NEIGHBORHOOD_CONFIG = gql`
+  mutation UpdateNeighborhoodConfig($input: NeighborhoodConfigInput!) {
+    updateNeighborhoodConfig(input: $input) {
+      seed
+      houseCount
+      publicChargerCount
+      battery {
+        capacityKwh
+        maxPowerKw
+        roundTripEfficiency
+        thresholdKw
+      }
+      assetDistribution {
+        type
+        share
+        count
+      }
+    }
+  }
+`;
+
 type HealthQueryResult = {
   health: string;
 };
@@ -120,9 +154,11 @@ const defaultSpeedMs = 700;
 export default function App() {
   const { data: healthData, loading: healthLoading, error: healthError } =
     useQuery<HealthQueryResult>(HEALTH_QUERY);
-  const { data: configData } = useQuery<NeighborhoodConfigResult>(NEIGHBORHOOD_CONFIG);
+  const { data: configData, refetch: refetchConfig } =
+    useQuery<NeighborhoodConfigResult>(NEIGHBORHOOD_CONFIG);
   const [runSimulation, { data: simData, loading: simLoading, error: simError }] =
     useMutation<RunSimulationResult>(RUN_SIMULATION);
+  const [updateConfig] = useMutation(UPDATE_NEIGHBORHOOD_CONFIG);
 
   const [stepMinutes, setStepMinutes] = useState(15);
   const [endDateTime, setEndDateTime] = useState(() => {
@@ -140,7 +176,7 @@ export default function App() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [speedMs, setSpeedMs] = useState(defaultSpeedMs);
-  const [view, setView] = useState<'neighborhood' | 'household' | 'public'>('neighborhood');
+  const [view, setView] = useState<'neighborhood' | 'household' | 'public' | 'config'>('neighborhood');
   const [selectedHouseholdId, setSelectedHouseholdId] = useState<string | null>(null);
 
   const households = useMemo(() => {
@@ -230,6 +266,10 @@ export default function App() {
             startDateTime={startDateTime}
             endDateTime={endDateTime}
             stepMinutes={stepMinutes}
+            batteryCapacityKwh={configData?.neighborhoodConfig.battery?.capacityKwh ?? 0}
+            batteryMaxPowerKw={configData?.neighborhoodConfig.battery?.maxPowerKw ?? 0}
+            batteryEfficiency={configData?.neighborhoodConfig.battery?.roundTripEfficiency ?? 0}
+            batteryThresholdKw={configData?.neighborhoodConfig.battery?.thresholdKw ?? 0}
             onStartDateTimeChange={setStartDateTime}
             onEndDateTimeChange={setEndDateTime}
             onStepMinutesChange={setStepMinutes}
@@ -269,6 +309,17 @@ export default function App() {
           <PublicChargersView
             simData={simData?.runSimulation ?? null}
             currentStepIndex={currentStepIndex}
+            publicChargers={chargers}
+          />
+        )}
+
+        {view === 'config' && (
+          <NeighborhoodConfigView
+            config={configData?.neighborhoodConfig ?? null}
+            onSave={async (input) => {
+              await updateConfig({ variables: { input } });
+              await refetchConfig();
+            }}
           />
         )}
       </div>
