@@ -1,17 +1,4 @@
-import { Field, Float, InputType, ObjectType } from '@nestjs/graphql';
-import { AssetInput } from './asset.models';
-
-@InputType()
-export class HouseholdInput {
-  @Field()
-  id!: string;
-
-  @Field()
-  name!: string;
-
-  @Field(() => [AssetInput])
-  assets!: AssetInput[];
-}
+import { Field, Float, ObjectType } from '@nestjs/graphql';
 
 @ObjectType()
 export class HouseholdStepResult {

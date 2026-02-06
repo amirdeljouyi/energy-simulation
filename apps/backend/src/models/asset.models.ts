@@ -1,4 +1,4 @@
-import { Field, Float, InputType, registerEnumType } from '@nestjs/graphql';
+import { registerEnumType } from '@nestjs/graphql';
 
 export enum AssetType {
   BASE_LOAD = 'BASE_LOAD',
@@ -9,21 +9,3 @@ export enum AssetType {
 }
 
 registerEnumType(AssetType, { name: 'AssetType' });
-
-@InputType()
-export class AssetInput {
-  @Field()
-  id!: string;
-
-  @Field({ nullable: true })
-  name?: string;
-
-  @Field(() => AssetType)
-  type!: AssetType;
-
-  @Field(() => Float)
-  ratedKw!: number;
-
-  @Field(() => [Float], { nullable: true })
-  profileKw?: number[];
-}
