@@ -1,5 +1,5 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
 import { AssetType } from '../models/asset.models';
 import {
   AssetConfig,
@@ -22,10 +22,18 @@ type RawNeighborhoodConfig = {
   };
 };
 
-const configPath = join(process.cwd(), 'apps/backend/src/config/neighborhood.config.json');
+const resolveConfigPath = () => {
+  const candidates = [
+    resolve(process.cwd(), 'src/config/neighborhood.config.json'),
+    resolve(process.cwd(), 'apps/backend/src/config/neighborhood.config.json'),
+  ];
+
+  const match = candidates.find((candidate) => existsSync(candidate));
+  return match ?? candidates[0];
+};
 
 const loadConfig = (): RawNeighborhoodConfig => {
-  const content = readFileSync(configPath, 'utf8');
+  const content = readFileSync(resolveConfigPath(), 'utf8');
   return JSON.parse(content) as RawNeighborhoodConfig;
 };
 

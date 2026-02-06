@@ -1,5 +1,6 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { SimulationInput, SimulationResult } from '../models/simulation.models';
+import { SimulationResult } from '../models/simulation.models';
+import { SimulationInput } from '../dto/simulation-input.dto';
 import { SimulationService } from './simulation.service';
 import { NeighborhoodConfig } from '../models/neighborhood.models';
 

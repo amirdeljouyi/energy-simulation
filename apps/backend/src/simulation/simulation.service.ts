@@ -1,12 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
-  SimulationInput,
   SimulationResult,
   SimulationStepResult,
   SimulationTotals,
   Season,
 } from '../models/simulation.models';
-import { AssetInput, AssetType } from '../models/asset.models';
+import { AssetType } from '../models/asset.models';
+import { AssetInput } from '../dto/asset-input.dto';
+import { SimulationInput } from '../dto/simulation-input.dto';
 import { HouseholdEnergyResult, HouseholdStepResult } from '../models/household.models';
 import { NeighborhoodConfig } from '../models/neighborhood.models';
 import { generateNeighborhoodConfig } from './neighborhood.generator';
