@@ -10,6 +10,7 @@ type SimulationClockPanelProps = {
   onStartDateTimeChange: (value: string) => void;
   onEndDateTimeChange: (value: string) => void;
   onStepMinutesChange: (value: number) => void;
+  stepMinutesDisabled?: boolean;
   onRunSimulation: () => void;
   simLoading: boolean;
   simError?: string;
@@ -25,6 +26,7 @@ export default function SimulationClockPanel({
   onStartDateTimeChange,
   onEndDateTimeChange,
   onStepMinutesChange,
+  stepMinutesDisabled,
   onRunSimulation,
   simLoading,
   simError,
@@ -73,6 +75,7 @@ export default function SimulationClockPanel({
             min={1}
             value={stepMinutes}
             onChange={(event) => onStepMinutesChange(Number(event.target.value))}
+            disabled={stepMinutesDisabled}
             className="rounded-xl border border-slate-200 px-3 py-2 text-slate-900 shadow-sm"
           />
         </label>

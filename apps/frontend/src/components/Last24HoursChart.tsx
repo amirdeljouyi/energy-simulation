@@ -73,7 +73,7 @@ export default function Last24HoursChart({
           />
           <polyline
             fill="none"
-            stroke="#0f766e"
+            stroke="#1C64F2"
             strokeWidth={3}
             strokeLinejoin="round"
             strokeLinecap="round"

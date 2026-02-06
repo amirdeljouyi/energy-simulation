@@ -59,6 +59,9 @@ export type HouseholdTotals = {
 export type HouseholdStepResult = {
   householdId: string;
   householdName: string;
+  baseLoadKw: number;
+  heatPumpKw: number;
+  homeEvKw: number;
   loadKw: number;
   pvKw: number;
   netLoadKw: number;
@@ -70,6 +73,10 @@ export type SimulationStep = {
   timestampIso: string;
   neighborhoodLoadKw: number;
   neighborhoodPvKw: number;
+  baseLoadKw: number;
+  heatPumpKw: number;
+  homeEvKw: number;
+  publicEvKw: number;
   gridImportKw: number;
   gridExportKw: number;
   season: string;

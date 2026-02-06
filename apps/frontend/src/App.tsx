@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import DashboardViewToggle from './components/DashboardViewToggle';
 import HouseholdView from './components/HouseholdView';
 import NeighborhoodView from './components/NeighborhoodView';
+import PublicChargersView from './components/PublicChargersView';
 import SimulationHeader from './components/SimulationHeader';
 import { baseHouseholds, publicChargers } from './data/simulationDefaults';
 import { NeighborhoodConfig, SimulationResult } from './types/simulation';
@@ -26,6 +27,10 @@ const RUN_SIMULATION = gql`
         timestampIso
         neighborhoodLoadKw
         neighborhoodPvKw
+        baseLoadKw
+        heatPumpKw
+        homeEvKw
+        publicEvKw
         gridImportKw
         gridExportKw
         season
@@ -34,6 +39,9 @@ const RUN_SIMULATION = gql`
         householdResults {
           householdId
           householdName
+          baseLoadKw
+          heatPumpKw
+          homeEvKw
           loadKw
           pvKw
           netLoadKw
@@ -132,7 +140,7 @@ export default function App() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [speedMs, setSpeedMs] = useState(defaultSpeedMs);
-  const [view, setView] = useState<'neighborhood' | 'household'>('neighborhood');
+  const [view, setView] = useState<'neighborhood' | 'household' | 'public'>('neighborhood');
   const [selectedHouseholdId, setSelectedHouseholdId] = useState<string | null>(null);
 
   const households = useMemo(() => {
@@ -247,11 +255,20 @@ export default function App() {
             selectedHouseholdId={selectedHouseholdId}
             onSelectHousehold={setSelectedHouseholdId}
             simData={simData?.runSimulation ?? null}
+            rangeStart={startDateTime}
+            rangeEnd={endDateTime}
             currentStepIndex={currentStepIndex}
             isPlaying={isPlaying}
             speedMs={speedMs}
             onTogglePlay={() => setIsPlaying((prev) => !prev)}
             onSpeedChange={setSpeedMs}
+          />
+        )}
+
+        {view === 'public' && (
+          <PublicChargersView
+            simData={simData?.runSimulation ?? null}
+            currentStepIndex={currentStepIndex}
           />
         )}
       </div>

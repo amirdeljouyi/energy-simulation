@@ -1,13 +1,44 @@
-import AssetTotalsTable from './AssetTotalsTable';
+import { useMemo, useState } from 'react';
+import type { ApexOptions } from 'apexcharts';
 import AssetsPanel from './AssetsPanel';
-import HouseholdTotalsTable from './HouseholdTotalsTable';
-import Last24HoursChart from './Last24HoursChart';
+import ChartCard from './ChartCard';
+import ChartSelect from './ChartSelect';
+import ChartRenderer from './ChartRenderer';
 import SimulationClockPanel from './SimulationClockPanel';
 import SimulationPlaybackPanel from './SimulationPlaybackPanel';
+import HouseholdTotalsTable from './HouseholdTotalsTable';
+import AssetTotalsTable from './AssetTotalsTable';
 import { AssetInput, HouseholdInput, SimulationResult } from '../types/simulation';
+import { baseChartOptions } from './chartTheme';
+import Last24HoursChart from './Last24HoursChart';
 
-const formatNetLoad = (step: SimulationResult['steps'][number]) =>
-  step.neighborhoodLoadKw - step.neighborhoodPvKw;
+const stepsForLast24Hours = (steps: SimulationResult['steps'], currentIndex: number, stepMinutes: number) => {
+  const stepsPerDay = Math.max(1, Math.round((24 * 60) / stepMinutes));
+  const startIndex = Math.max(0, currentIndex - stepsPerDay + 1);
+  return steps.slice(startIndex, currentIndex + 1);
+};
+
+const groupByDay = (steps: SimulationResult['steps'], stepMinutes: number) => {
+  const stepHours = stepMinutes / 60;
+  const map = new Map<string, { loadKwh: number; pvKwh: number }>();
+
+  steps.forEach((step) => {
+    const dateKey = step.timestampIso.slice(0, 10);
+    const current = map.get(dateKey) ?? { loadKwh: 0, pvKwh: 0 };
+    current.loadKwh += step.neighborhoodLoadKw * stepHours;
+    current.pvKwh += step.neighborhoodPvKw * stepHours;
+    map.set(dateKey, current);
+  });
+
+  const labels = Array.from(map.keys()).sort();
+  return {
+    labels,
+    load: labels.map((label) => map.get(label)?.loadKwh ?? 0),
+    pv: labels.map((label) => map.get(label)?.pvKwh ?? 0),
+  };
+};
+
+const chartOptionsBase: ApexOptions = baseChartOptions;
 
 type NeighborhoodViewProps = {
   healthStatus: string;
@@ -32,6 +63,17 @@ type NeighborhoodViewProps = {
   currentStepIndex: number;
 };
 
+const chartOptions = [
+  { id: 'area', label: 'Neighbourhood usage over time' },
+  { id: 'daily', label: 'Daily energy consumption vs generation' },
+  { id: 'top', label: 'Top households by energy usage' },
+  { id: 'share', label: 'Energy share by asset type' },
+] as const;
+
+type ChartOption = (typeof chartOptions)[number]['id'];
+
+type TopHouseholdWindow = 'since-start' | 'last-24h';
+
 export default function NeighborhoodView({
   healthStatus,
   startDateTime,
@@ -54,6 +96,157 @@ export default function NeighborhoodView({
   onSpeedChange,
   currentStepIndex,
 }: NeighborhoodViewProps) {
+  const [chartSelection, setChartSelection] = useState<ChartOption>('area');
+  const [topWindow, setTopWindow] = useState<TopHouseholdWindow>('since-start');
+
+  const last24Steps = useMemo(() => {
+    if (!simData) {
+      return [];
+    }
+    return stepsForLast24Hours(simData.steps, currentStepIndex, stepMinutes);
+  }, [simData, currentStepIndex, stepMinutes]);
+
+  const renderChart = () => {
+    if (!simData) {
+      return null;
+    }
+
+    if (chartSelection === 'area') {
+      const series = [
+        {
+          name: 'Base load',
+          data: last24Steps.map((step) => ({
+            x: new Date(step.timestampIso).getTime(),
+            y: step.baseLoadKw,
+          })),
+        },
+        {
+          name: 'Heat pumps',
+          data: last24Steps.map((step) => ({
+            x: new Date(step.timestampIso).getTime(),
+            y: step.heatPumpKw,
+          })),
+        },
+        {
+          name: 'EV charging',
+          data: last24Steps.map((step) => ({
+            x: new Date(step.timestampIso).getTime(),
+            y: step.homeEvKw + step.publicEvKw,
+          })),
+        },
+        {
+          name: 'PV generation',
+          data: last24Steps.map((step) => ({
+            x: new Date(step.timestampIso).getTime(),
+            y: -step.neighborhoodPvKw,
+          })),
+        },
+      ];
+
+      const options: ApexOptions = {
+        ...chartOptionsBase,
+        chart: { ...chartOptionsBase.chart, stacked: true, type: 'area' },
+        xaxis: { type: 'datetime' },
+        yaxis: {
+          labels: {
+            formatter: (value) => `${value.toFixed(1)} kW`,
+          },
+        },
+        tooltip: { y: { formatter: (value) => `${value.toFixed(2)} kW` } },
+      };
+
+      return <ChartRenderer options={options} series={series} type="area" height={320} />;
+    }
+
+    if (chartSelection === 'daily') {
+      const grouped = groupByDay(simData.steps, stepMinutes);
+      const series = [
+        { name: 'Consumed', data: grouped.load },
+        { name: 'PV generated', data: grouped.pv },
+      ];
+
+      const options: ApexOptions = {
+        ...chartOptionsBase,
+        chart: { ...chartOptionsBase.chart, type: 'bar' },
+        plotOptions: { bar: { columnWidth: '45%', horizontal: false } },
+        xaxis: { categories: grouped.labels },
+        yaxis: { labels: { formatter: (value) => `${value.toFixed(1)} kWh` } },
+        tooltip: { y: { formatter: (value) => `${value.toFixed(1)} kWh` } },
+      };
+
+      return <ChartRenderer options={options} series={series} type="bar" height={320} />;
+    }
+
+    if (chartSelection === 'top') {
+      const stepHours = stepMinutes / 60;
+      const stepsToUse = topWindow === 'last-24h' ? last24Steps : simData.steps;
+      const totalsMap = new Map<string, number>();
+
+      stepsToUse.forEach((step) => {
+        step.householdResults.forEach((household) => {
+          totalsMap.set(
+            household.householdName,
+            (totalsMap.get(household.householdName) ?? 0) + household.loadKw * stepHours,
+          );
+        });
+      });
+
+      const sorted = Array.from(totalsMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+      const labels = sorted.map(([name]) => name);
+      const values = sorted.map(([, value]) => value);
+
+      const options: ApexOptions = {
+        ...chartOptionsBase,
+        chart: { ...chartOptionsBase.chart, type: 'bar' },
+        plotOptions: { bar: { horizontal: true, barHeight: '60%' } },
+        xaxis: { categories: labels },
+        yaxis: { labels: { formatter: (value) => `${value.toFixed(1)} kWh` } },
+        tooltip: { y: { formatter: (value) => `${value.toFixed(1)} kWh` } },
+      };
+
+      return (
+        <ChartRenderer
+          options={options}
+          series={[{ name: 'Energy', data: values }]}
+          type="bar"
+          height={320}
+        />
+      );
+    }
+
+    const stepHours = stepMinutes / 60;
+    const totals = simData.steps.reduce(
+      (acc, step) => {
+        acc.base += step.baseLoadKw * stepHours;
+        acc.heat += step.heatPumpKw * stepHours;
+        acc.homeEv += step.homeEvKw * stepHours;
+        acc.publicEv += step.publicEvKw * stepHours;
+        acc.pv += step.neighborhoodPvKw * stepHours;
+        return acc;
+      },
+      { base: 0, heat: 0, homeEv: 0, publicEv: 0, pv: 0 },
+    );
+
+    const options: ApexOptions = {
+      ...chartOptionsBase,
+      chart: { ...chartOptionsBase.chart, type: 'donut' },
+      labels: ['Base load', 'Heat pumps', 'Home EV', 'Public EV', 'PV generation'],
+      tooltip: { y: { formatter: (value) => `${value.toFixed(1)} kWh` } },
+    };
+
+    return (
+      <ChartRenderer
+        options={options}
+        series={[totals.base, totals.heat, totals.homeEv, totals.publicEv, totals.pv]}
+        type="donut"
+        height={320}
+      />
+    );
+  };
+
   return (
     <>
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
@@ -70,6 +263,7 @@ export default function NeighborhoodView({
           simError={simError}
           latestStep={latestStep}
           totals={totals}
+          stepMinutesDisabled
         />
 
         <AssetsPanel households={households} publicChargers={publicChargers} />
@@ -86,14 +280,45 @@ export default function NeighborhoodView({
             currentIndex={currentStepIndex}
             totalSteps={simData.steps.length}
           />
+
           <Last24HoursChart
             steps={simData.steps}
             currentIndex={currentStepIndex}
             stepMinutes={simData.clock.stepMinutes}
             title="Last 24 hours (net load)"
             subtitle="Net load = neighborhood load minus PV generation."
-            valueAccessor={formatNetLoad}
+            valueAccessor={(step) => step.neighborhoodLoadKw - step.neighborhoodPvKw}
           />
+
+          <ChartCard
+            title="Neighbourhood charts"
+            subtitle="Choose a chart to explore usage and gains."
+            controls={
+              <>
+                <ChartSelect
+                  value={chartSelection}
+                  options={chartOptions.map((option) => ({
+                    value: option.id,
+                    label: option.label,
+                  }))}
+                  onChange={(value) => setChartSelection(value as ChartOption)}
+                />
+                {chartSelection === 'top' && (
+                  <ChartSelect
+                    value={topWindow}
+                    options={[
+                      { value: 'since-start', label: 'Since start' },
+                      { value: 'last-24h', label: 'Last 24h' },
+                    ]}
+                    onChange={(value) => setTopWindow(value as TopHouseholdWindow)}
+                  />
+                )}
+              </>
+            }
+          >
+            {renderChart()}
+          </ChartCard>
+
           <HouseholdTotalsTable totals={simData.householdTotals} />
           <AssetTotalsTable totals={simData.assetTotals} />
         </>

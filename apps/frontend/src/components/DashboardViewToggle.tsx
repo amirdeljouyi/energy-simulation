@@ -1,6 +1,6 @@
 type DashboardViewToggleProps = {
-  view: 'neighborhood' | 'household';
-  onChange: (view: 'neighborhood' | 'household') => void;
+  view: 'neighborhood' | 'household' | 'public';
+  onChange: (view: 'neighborhood' | 'household' | 'public') => void;
 };
 
 export default function DashboardViewToggle({ view, onChange }: DashboardViewToggleProps) {
@@ -23,6 +23,15 @@ export default function DashboardViewToggle({ view, onChange }: DashboardViewTog
         }`}
       >
         Household
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('public')}
+        className={`rounded-full px-4 py-2 font-semibold ${
+          view === 'public' ? 'bg-slate-900 text-white' : 'text-slate-600'
+        }`}
+      >
+        Public Chargers
       </button>
     </div>
   );
