@@ -317,6 +317,21 @@ export default function NeighborhoodView({
     );
   };
 
+  const assetTypeTotals = simData
+    ? simData.steps.reduce(
+        (acc, step) => {
+          const stepHours = stepMinutes / 60;
+          acc.base += step.baseLoadKw * stepHours;
+          acc.heat += step.heatPumpKw * stepHours;
+          acc.homeEv += step.homeEvKw * stepHours;
+          acc.publicEv += step.publicEvKw * stepHours;
+          acc.pv += step.neighborhoodPvKw * stepHours;
+          return acc;
+        },
+        { base: 0, heat: 0, homeEv: 0, publicEv: 0, pv: 0 },
+      )
+    : null;
+
   return (
     <>
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
@@ -438,6 +453,46 @@ export default function NeighborhoodView({
               </div>
             )}
           </ChartCard>
+
+          {assetTypeTotals && (
+            <ChartCard
+              title="Asset aggregation"
+              subtitle="Total energy by asset type (kWh since simulation start)"
+            >
+              <div className="grid gap-3 text-sm text-slate-600 md:grid-cols-2">
+                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <span>Base load</span>
+                  <span className="font-semibold text-slate-900">
+                    {assetTypeTotals.base.toFixed(1)} kWh
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <span>Heat pumps</span>
+                  <span className="font-semibold text-slate-900">
+                    {assetTypeTotals.heat.toFixed(1)} kWh
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <span>Home EV charging</span>
+                  <span className="font-semibold text-slate-900">
+                    {assetTypeTotals.homeEv.toFixed(1)} kWh
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <span>Public EV charging</span>
+                  <span className="font-semibold text-slate-900">
+                    {assetTypeTotals.publicEv.toFixed(1)} kWh
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <span>PV generation</span>
+                  <span className="font-semibold text-slate-900">
+                    {assetTypeTotals.pv.toFixed(1)} kWh
+                  </span>
+                </div>
+              </div>
+            </ChartCard>
+          )}
 
           <HouseholdTotalsTable totals={simData.householdTotals} />
           <AssetTotalsTable totals={simData.assetTotals} />
