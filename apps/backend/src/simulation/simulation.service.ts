@@ -8,6 +8,8 @@ import {
 } from '../models/simulation.models';
 import { AssetInput, AssetType } from '../models/asset.models';
 import { HouseholdEnergyResult, HouseholdStepResult } from '../models/household.models';
+import { NeighborhoodConfig } from '../models/neighborhood.models';
+import { generateNeighborhoodConfig } from './neighborhood.generator';
 
 interface AssetAccumulator {
   assetId: string;
@@ -20,6 +22,10 @@ type HouseholdAccumulator = HouseholdEnergyResult;
 
 @Injectable()
 export class SimulationService {
+  getNeighborhoodConfig(): NeighborhoodConfig {
+    return generateNeighborhoodConfig();
+  }
+
   runSimulation(input: SimulationInput): SimulationResult {
     this.validateInput(input);
 
@@ -277,6 +283,10 @@ export class SimulationService {
         );
       }
     });
+
+    if (input.households.length !== 30) {
+      throw new BadRequestException('households must include 30 entries');
+    }
 
     if (input.publicChargers.length !== 6) {
       throw new BadRequestException('publicChargers must include 6 assets');

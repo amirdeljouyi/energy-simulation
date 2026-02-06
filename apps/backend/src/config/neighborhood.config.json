@@ -1,0 +1,17 @@
+{
+  "seed": 1337,
+  "houseCount": 30,
+  "publicChargerCount": 6,
+  "assetDistribution": {
+    "PV": 0.4,
+    "HEAT_PUMP": 0.3,
+    "HOME_EV_CHARGER": 0.2
+  },
+  "defaults": {
+    "baseLoadKw": 1.8,
+    "pvKw": 2.8,
+    "heatPumpKw": 1.4,
+    "homeEvKw": 3.6,
+    "publicEvKw": 7.2
+  }
+}

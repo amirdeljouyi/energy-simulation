@@ -76,8 +76,37 @@ type SimulationResult {
   totals: SimulationTotals!
 }
 
+type AssetConfig {
+  id: String!
+  name: String
+  type: AssetType!
+  ratedKw: Float!
+}
+
+type HouseholdConfig {
+  id: String!
+  name: String!
+  assets: [AssetConfig!]!
+}
+
+type AssetDistribution {
+  type: AssetType!
+  share: Float!
+  count: Int!
+}
+
+type NeighborhoodConfig {
+  seed: Int!
+  houseCount: Int!
+  publicChargerCount: Int!
+  assetDistribution: [AssetDistribution!]!
+  households: [HouseholdConfig!]!
+  publicChargers: [AssetConfig!]!
+}
+
 type Query {
   health: String!
+  neighborhoodConfig: NeighborhoodConfig!
 }
 
 type Mutation {
