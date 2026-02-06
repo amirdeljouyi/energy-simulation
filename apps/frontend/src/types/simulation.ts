@@ -12,6 +12,21 @@ export type HouseholdInput = {
   assets: AssetInput[];
 };
 
+export type AssetDistribution = {
+  type: string;
+  share: number;
+  count: number;
+};
+
+export type NeighborhoodConfig = {
+  seed: number;
+  houseCount: number;
+  publicChargerCount: number;
+  assetDistribution: AssetDistribution[];
+  households: HouseholdInput[];
+  publicChargers: AssetInput[];
+};
+
 export type SimulationClock = {
   startDateTimeIso: string;
   stepMinutes: number;

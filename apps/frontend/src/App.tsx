@@ -8,7 +8,7 @@ import SimulationClockPanel from './components/SimulationClockPanel';
 import SimulationHeader from './components/SimulationHeader';
 import SimulationPlaybackPanel from './components/SimulationPlaybackPanel';
 import { baseHouseholds, publicChargers } from './data/simulationDefaults';
-import { SimulationResult } from './types/simulation';
+import { NeighborhoodConfig, SimulationResult } from './types/simulation';
 
 const HEALTH_QUERY = gql`
   query Health {
@@ -59,6 +59,37 @@ const RUN_SIMULATION = gql`
   }
 `;
 
+const NEIGHBORHOOD_CONFIG = gql`
+  query NeighborhoodConfig {
+    neighborhoodConfig {
+      seed
+      houseCount
+      publicChargerCount
+      assetDistribution {
+        type
+        share
+        count
+      }
+      households {
+        id
+        name
+        assets {
+          id
+          name
+          type
+          ratedKw
+        }
+      }
+      publicChargers {
+        id
+        name
+        type
+        ratedKw
+      }
+    }
+  }
+`;
+
 type HealthQueryResult = {
   health: string;
 };
@@ -67,11 +98,16 @@ type RunSimulationResult = {
   runSimulation: SimulationResult;
 };
 
+type NeighborhoodConfigResult = {
+  neighborhoodConfig: NeighborhoodConfig;
+};
+
 const defaultSpeedMs = 700;
 
 export default function App() {
   const { data: healthData, loading: healthLoading, error: healthError } =
     useQuery<HealthQueryResult>(HEALTH_QUERY);
+  const { data: configData } = useQuery<NeighborhoodConfigResult>(NEIGHBORHOOD_CONFIG);
   const [runSimulation, { data: simData, loading: simLoading, error: simError }] =
     useMutation<RunSimulationResult>(RUN_SIMULATION);
 
@@ -87,6 +123,9 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [speedMs, setSpeedMs] = useState(defaultSpeedMs);
 
+  const households = configData?.neighborhoodConfig.households ?? baseHouseholds;
+  const chargers = configData?.neighborhoodConfig.publicChargers ?? publicChargers;
+
   const simulationInput = useMemo(() => {
     const startDateTimeIso = new Date(startDateTime).toISOString();
     return {
@@ -95,10 +134,10 @@ export default function App() {
         stepMinutes: Number(stepMinutes),
         steps: Number(steps),
       },
-      households: baseHouseholds,
-      publicChargers,
+      households,
+      publicChargers: chargers,
     };
-  }, [startDateTime, stepMinutes, steps]);
+  }, [startDateTime, stepMinutes, steps, households, chargers]);
 
   useEffect(() => {
     setCurrentStepIndex(0);
@@ -152,7 +191,7 @@ export default function App() {
             totals={totals}
           />
 
-          <AssetsPanel households={baseHouseholds} publicChargers={publicChargers} />
+          <AssetsPanel households={households} publicChargers={chargers} />
         </section>
 
         {simData && (
