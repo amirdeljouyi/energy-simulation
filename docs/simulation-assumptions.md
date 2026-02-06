@@ -21,3 +21,10 @@
 - Seasons are month-based: Dec-Feb winter, Mar-May spring, Jun-Aug summer, Sep-Nov autumn.
 - Temperature is modeled as a smooth seasonal curve and drives heat pump demand.
 - PV output is scaled by an irradiance factor derived from season and temperature.
+
+## Neighborhood configuration
+- A JSON configuration file defines a fixed seed, counts, and asset distribution.
+- The system generates exactly 30 houses and 6 public chargers using the seed.
+- Assets are distributed deterministically across houses according to the configured shares.
+- Configuration file: `apps/backend/src/config/neighborhood.config.json`.
+- Default distribution: 40% PV, 30% heat pumps, 20% home EV chargers.

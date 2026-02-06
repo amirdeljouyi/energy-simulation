@@ -21,9 +21,11 @@ Model neighborhood energy sharing to understand how local generation and policie
 - Battery parameters (capacity, power).
 - Policy toggles (share surplus, grid export).
 - Weather/season inputs derived deterministically from the simulation clock.
+- Neighborhood configuration with fixed seed, counts, and asset distribution.
 
 ## Outputs
 - Per-household metrics.
 - Aggregate metrics.
 - Per-time-step series including simulated time, weather, and net load.
 - UI visualization with playback controls and last-24-hours chart.
+- Generated neighborhood configuration summary (counts and distributions).
