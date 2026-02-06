@@ -39,6 +39,7 @@
 - Run simulations and store results.
 - Provide GraphQL API and schema.
 - Basic validation and data normalization.
+- Provide deterministic neighborhood configuration and weather/season modeling.
 
 ### Modules
 - GraphQLModule (Apollo)
@@ -54,6 +55,10 @@
 - Inputs: households, assets, datasets, policy.
 - Time step: compute self-consumption, share surplus, grid flow.
 - Outputs: per-household metrics + aggregated metrics.
+
+## Testing
+- Jest unit tests cover the neighborhood generator and weather-driven simulation logic.
+- Focus on deterministic behavior (seeded distributions, PV/heat-pump scaling).
 
 ## Data Storage (Phase 1)
 - PostgreSQL (preferred) or SQLite for local dev.

@@ -134,8 +134,8 @@ enum Season {
 
 input SimulationClockInput {
   startDateTimeIso: String!
+  endDateTimeIso: String!
   stepMinutes: Int!
-  steps: Int!
 }
 
 input AssetInput {
@@ -160,8 +160,8 @@ input SimulationInput {
 
 type SimulationClock {
   startDateTimeIso: String!
+  endDateTimeIso: String!
   stepMinutes: Int!
-  steps: Int!
 }
 
 type SimulationStepResult {
@@ -169,6 +169,14 @@ type SimulationStepResult {
   timestampIso: String!
   neighborhoodLoadKw: Float!
   neighborhoodPvKw: Float!
+  baseLoadKw: Float!
+  heatPumpKw: Float!
+  homeEvKw: Float!
+  publicEvKw: Float!
+  netLoadKw: Float!
+  netLoadWithBatteryKw: Float!
+  batteryPowerKw: Float!
+  batterySocKwh: Float!
   gridImportKw: Float!
   gridExportKw: Float!
   season: Season!
@@ -180,6 +188,9 @@ type SimulationStepResult {
 type HouseholdStepResult {
   householdId: ID!
   householdName: String!
+  baseLoadKw: Float!
+  heatPumpKw: Float!
+  homeEvKw: Float!
   loadKw: Float!
   pvKw: Float!
   netLoadKw: Float!
@@ -207,6 +218,8 @@ type SimulationTotals {
   neighborhoodExportKwh: Float!
   neighborhoodConsumptionKwh: Float!
   neighborhoodPvKwh: Float!
+  peakLoadKw: Float!
+  peakLoadWithBatteryKw: Float!
 }
 
 type SimulationResult {
@@ -240,9 +253,17 @@ type NeighborhoodConfig {
   seed: Int!
   houseCount: Int!
   publicChargerCount: Int!
+  battery: BatteryConfig!
   assetDistribution: [AssetDistribution!]!
   households: [HouseholdConfig!]!
   publicChargers: [AssetConfig!]!
+}
+
+type BatteryConfig {
+  capacityKwh: Float!
+  maxPowerKw: Float!
+  roundTripEfficiency: Float!
+  thresholdKw: Float!
 }
 
 type Mutation {
@@ -251,5 +272,29 @@ type Mutation {
 
 type Query {
   neighborhoodConfig: NeighborhoodConfig!
+}
+
+input AssetDistributionInput {
+  type: AssetType!
+  share: Float!
+}
+
+input BatteryConfigInput {
+  capacityKwh: Float!
+  maxPowerKw: Float!
+  roundTripEfficiency: Float!
+  thresholdKw: Float!
+}
+
+input NeighborhoodConfigInput {
+  seed: Int
+  houseCount: Int
+  publicChargerCount: Int
+  assetDistribution: [AssetDistributionInput!]
+  battery: BatteryConfigInput
+}
+
+type Mutation {
+  updateNeighborhoodConfig(input: NeighborhoodConfigInput!): NeighborhoodConfig!
 }
 ```
