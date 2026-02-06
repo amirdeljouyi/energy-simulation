@@ -9,21 +9,18 @@
 
 ## Scope (Phase 1)
 - Single neighborhood with multiple households.
-- Time series inputs (load, solar, battery) for each household.
-- Simple policy rules (self-consume, share surplus, grid import/export).
+- Deterministic profiles and diurnal patterns for loads and PV.
+- Simple policy rules (self-consume, grid import/export).
 - Deterministic simulation (no stochastic weather yet).
 - Deterministic weather + season factors that affect PV and heat pump demand.
-
-## Out of Scope (Phase 1)
-- Real-time IoT ingestion.
-- Multi-neighborhood network effects.
-- Complex tariff optimization.
+- Neighbourhood battery with peak shaving control.
 
 ## Core Concepts
 - Household: energy consumer/producer with assets (PV, battery).
 - SimulationRun: configuration + input datasets + policy.
 - TimeStep: discrete slot with computed energy flows.
 - Policy: rules for sharing and grid interaction.
+- NeighborhoodConfig: seed, counts, distribution, battery config.
 
 ## Primary Users
 - Researcher analyzing energy sharing effects.
@@ -35,6 +32,7 @@
 - Results include per-household and aggregated metrics.
 - UI renders charts for energy flows and cost summary.
 - UI includes animated simulation playback and a last-24-hours net-load chart.
+- UI provides selectable charts for neighbourhood, household, and public chargers.
 
 ## Deliverables
 - React frontend blueprint and module plan.

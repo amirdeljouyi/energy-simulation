@@ -2,12 +2,13 @@
 
 ## Key components and responsibilities
 - Backend (NestJS + GraphQL): deterministic simulation engine, neighborhood configuration generator, weather/season modeling, energy accounting, and API exposure.
-- Frontend (React): simulation configuration, animated playback, charts, and results tables.
+- Frontend (React): configuration editing, animated playback, chart selector views, and results tables.
 - Configuration: JSON-driven neighborhood definition with fixed seed and asset distribution.
 
 ## Data model
 - Household: `id`, `name`, `assets` (always includes `BASE_LOAD`).
 - Asset: `id`, `name`, `type`, `ratedKw`, optional `profileKw`.
+- Battery: `capacityKwh`, `maxPowerKw`, `roundTripEfficiency`, `thresholdKw`.
 - Simulation clock: `startDateTimeIso`, `endDateTimeIso`, `stepMinutes`.
 - Weather snapshot (per step): `season`, `temperatureC`, `irradianceFactor`.
 - Results:
@@ -17,14 +18,16 @@
 - Neighborhood battery provides peak shaving with SOC and power limits.
 
 ## Assumptions
-- EV charging behavior: home and public chargers draw a fixed `ratedKw` (no time-of-day charging model yet).
+- EV charging behavior: home and public chargers use deterministic time-of-day profiles.
 - PV usage/export: PV offsets household load first; surplus exports to grid.
 - Heat pump model: consumption scales with deterministic temperature; colder weather increases load.
 - Weather/season: deterministic, month-based seasons with a smooth temperature curve; irradiance is derived from season/temperature.
 - Neighborhood configuration: deterministic seeded allocation of assets; exactly 30 houses and 6 public chargers.
+- Public charger capacity can vary deterministically per charger.
 
 ## Known limitations
-- No storage/battery model or time-varying profiles beyond optional `profileKw` arrays.
+- No tariff modeling, demand response, or policy optimization.
+- Battery control is rule-based (threshold + charge band), not optimized.
 - No tariff modeling, demand response, or policy optimization.
 - No persistence for simulation runs; results are computed in-memory.
 - UI charts are simple line plots without zoom or export.

@@ -29,7 +29,6 @@ npm run dev:frontend
 - Architecture: `docs/architecture.md`
 - GraphQL Draft: `docs/api-graphql.md`
 - Product Requirements: `docs/product-requirements.md`
-- Decision Log: `docs/decisions.md`
 - Simulation assumptions: `docs/simulation-assumptions.md`
 - Design overview: `docs/design-overview.md`
 

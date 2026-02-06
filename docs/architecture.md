@@ -8,26 +8,19 @@
 
 ## Frontend (React)
 ### Responsibilities
-- Scenario setup (households, assets, policies, time series upload).
 - Run simulation (trigger backend mutation).
 - Results visualization (charts, tables, metrics).
-- Documentation access (link to docs pages).
+- Neighbourhood configuration editing (seed, counts, battery, asset shares).
 
 ### Key Pages
-- Home: overview, recent runs.
-- Scenario Builder: household list, asset config, policy config.
-- Data Import: upload CSVs for load/solar/battery profiles.
-- Run Detail: charts, flows, cost summary, export.
-- Docs: embedded links to docs.
+- Dashboard: neighbourhood, household, public charger views with chart selectors.
+- Configuration: seeded neighbourhood settings and asset distribution.
 
 ### Core Components
-- HouseholdForm
-- AssetConfigPanel
-- PolicySelector
-- TimeseriesUploader
-- SimulationRunButton
-- ResultsDashboard
-- ChartPanel (energy flow, SOC, grid import/export)
+- DashboardViewToggle
+- NeighborhoodView / HouseholdView / PublicChargersView
+- ChartCard / ChartRenderer / ChartSelect
+- SimulationClockPanel
 
 ### State Management
 - React Query or Apollo Client for GraphQL.
@@ -35,35 +28,36 @@
 
 ## Backend (NestJS)
 ### Responsibilities
-- CRUD for households, assets, policies, datasets.
-- Run simulations and store results.
-- Provide GraphQL API and schema.
+- Deterministic neighborhood configuration and weather/season modeling.
+- Run simulations and return results via GraphQL.
 - Basic validation and data normalization.
-- Provide deterministic neighborhood configuration and weather/season modeling.
+- Persist JSON outputs per run for inspection.
 
 ### Modules
 - GraphQLModule (Apollo)
 - SimulationModule (core engine)
-- HouseholdsModule
-- AssetsModule
-- PoliciesModule
-- DatasetsModule (timeseries)
-- RunsModule (persisted simulation runs)
-- AuthModule (Phase 2)
 
-### Simulation Engine (Phase 1)
-- Inputs: households, assets, datasets, policy.
-- Time step: compute self-consumption, share surplus, grid flow.
-- Outputs: per-household metrics + aggregated metrics.
+### Simulation Engine
+- Inputs: neighborhood config, assets, simulation clock.
+- Time step: compute consumption, PV, weather effects, battery dispatch, grid flow.
+- Outputs: per-household metrics + aggregated metrics + battery/peak info.
+
+## Domain Models
+- Asset: type, rated power, optional profile.
+- Household: name, assets.
+- NeighborhoodConfig: seed, house/public counts, asset distribution, battery config.
+- BatteryConfig: capacity, max power, efficiency, threshold.
+- SimulationClock: start/end time and step size.
+- SimulationStepResult: per-step power, weather, battery state, household breakdowns.
+- SimulationTotals: aggregate energy and peak metrics.
 
 ## Testing
 - Jest unit tests cover the neighborhood generator and weather-driven simulation logic.
 - Focus on deterministic behavior (seeded distributions, PV/heat-pump scaling).
 
 ## Data Storage (Phase 1)
-- PostgreSQL (preferred) or SQLite for local dev.
-- Timeseries stored as table rows or JSON blobs (Phase 1).
+- JSON outputs stored under `apps/backend/output/` for inspection.
 
 ## Deployment (Phase 1)
-- Local dev with docker-compose for DB.
-- CI to run lint/test for frontend and backend.
+- Local dev with Docker Compose for frontend/backend.
+- CI can run lint/test for frontend and backend.
