@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import {
   SimulationResult,
   SimulationStepResult,
@@ -86,6 +88,7 @@ export class SimulationService {
           assetAccumulators,
           stepHours,
           weather,
+          timestampDate,
         );
         const pvKw = this.sumAssetPower(
           household.assets,
@@ -94,6 +97,7 @@ export class SimulationService {
           assetAccumulators,
           stepHours,
           weather,
+          timestampDate,
         );
 
         const netLoadKw = Math.max(loadKw - pvKw, 0);
@@ -127,6 +131,7 @@ export class SimulationService {
         assetAccumulators,
         stepHours,
         weather,
+        timestampDate,
       );
       neighborhoodLoadKw += publicLoadKw;
       gridImportKw += publicLoadKw;
@@ -162,13 +167,39 @@ export class SimulationService {
       neighborhoodPvKwh,
     };
 
-    return {
+    const result: SimulationResult = {
       clock,
       steps,
       householdTotals: householdAccumulators,
       assetTotals: Array.from(assetAccumulators.values()),
       totals,
     };
+
+    this.persistResults(result);
+
+    return result;
+  }
+
+  private persistResults(result: SimulationResult): void {
+    const outputDir = join(process.cwd(), 'apps/backend/output');
+    mkdirSync(outputDir, { recursive: true });
+
+    const publicAssetTotals = result.assetTotals.filter(
+      (asset) => asset.type === AssetType.PUBLIC_EV_CHARGER,
+    );
+
+    const payload = {
+      generatedAtIso: new Date().toISOString(),
+      clock: result.clock,
+      totals: result.totals,
+      steps: result.steps,
+      householdTotals: result.householdTotals,
+      publicAssetTotals,
+    };
+
+    const filename = `simulation-${Date.now()}.json`;
+    const filePath = join(outputDir, filename);
+    writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
   }
 
   private sumAssetPower(
@@ -178,6 +209,7 @@ export class SimulationService {
     accumulators: Map<string, AssetAccumulator>,
     stepHours: number,
     weather?: { temperatureC: number; irradianceFactor: number },
+    timestamp?: Date,
   ): number {
     return assets.reduce((total, asset) => {
       const isPv = asset.type === AssetType.PV;
@@ -185,7 +217,7 @@ export class SimulationService {
         return total;
       }
 
-      const kw = this.resolveAssetKw(asset, stepIndex, weather);
+      const kw = this.resolveAssetKw(asset, stepIndex, weather, timestamp);
       const accumulator = accumulators.get(asset.id);
       if (accumulator) {
         accumulator.cumulativeKwh += kw * stepHours;
@@ -199,33 +231,39 @@ export class SimulationService {
     asset: AssetInput,
     stepIndex: number,
     weather?: { temperatureC: number; irradianceFactor: number },
+    timestamp?: Date,
   ): number {
     if (asset.profileKw && asset.profileKw.length > 0) {
       const baseKw = asset.profileKw[stepIndex] ?? asset.ratedKw;
-      return this.applyWeather(asset.type, baseKw, weather);
+      return this.applyWeather(asset.type, baseKw, weather, timestamp);
     }
-    return this.applyWeather(asset.type, asset.ratedKw, weather);
+    return this.applyWeather(asset.type, asset.ratedKw, weather, timestamp);
   }
 
   private applyWeather(
     assetType: AssetType,
     baseKw: number,
     weather?: { temperatureC: number; irradianceFactor: number },
+    timestamp?: Date,
   ): number {
+    const timeFactor = timestamp ? this.getDiurnalFactor(assetType, timestamp) : 1;
+    const adjustedKw = baseKw * timeFactor;
+
     if (!weather) {
-      return baseKw;
+      return adjustedKw;
     }
 
     if (assetType === AssetType.PV) {
-      return baseKw * weather.irradianceFactor;
+      const solarFactor = timestamp ? this.getSolarFactor(timestamp) : 1;
+      return adjustedKw * weather.irradianceFactor * solarFactor;
     }
 
     if (assetType === AssetType.HEAT_PUMP) {
       const demandFactor = Math.min(1.8, Math.max(0.6, (18 - weather.temperatureC) / 12));
-      return baseKw * demandFactor;
+      return adjustedKw * demandFactor;
     }
 
-    return baseKw;
+    return adjustedKw;
   }
 
   private getWeatherSnapshot(timestamp: Date): {
@@ -264,6 +302,40 @@ export class SimulationService {
     const base = 0.45 + Math.sin(((month + 1) / 12) * Math.PI * 2) * 0.35;
     const tempModifier = temperatureC > 15 ? 1.05 : temperatureC < 0 ? 0.9 : 1.0;
     return Math.min(1.0, Math.max(0.1, base * tempModifier));
+  }
+
+  private getSolarFactor(timestamp: Date): number {
+    const hour = timestamp.getUTCHours() + timestamp.getUTCMinutes() / 60;
+    const radians = ((hour - 6) / 12) * Math.PI;
+    return Math.max(0, Math.sin(radians));
+  }
+
+  private getDiurnalFactor(assetType: AssetType, timestamp: Date): number {
+    const hour = timestamp.getUTCHours() + timestamp.getUTCMinutes() / 60;
+
+    if (assetType === AssetType.HOME_EV_CHARGER) {
+      if (hour >= 18 && hour < 23) {
+        return 1.2;
+      }
+      if (hour >= 0 && hour < 6) {
+        return 0.3;
+      }
+      return 0.6;
+    }
+
+    if (assetType === AssetType.PUBLIC_EV_CHARGER) {
+      if (hour >= 8 && hour < 18) {
+        return 1.1;
+      }
+      return 0.5;
+    }
+
+    if (assetType === AssetType.BASE_LOAD) {
+      const radians = ((hour - 19) / 24) * Math.PI * 2;
+      return 0.7 + 0.3 * ((1 + Math.cos(radians)) / 2);
+    }
+
+    return 1;
   }
 
   private validateInput(input: SimulationInput): void {

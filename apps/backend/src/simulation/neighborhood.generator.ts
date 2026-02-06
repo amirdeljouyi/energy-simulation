@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'fs';
-import { resolve } from 'path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { join, resolve } from 'path';
 import { AssetType } from '../models/asset.models';
 import {
   AssetConfig,
@@ -167,7 +167,7 @@ export const generateNeighborhoodConfig = (): NeighborhoodConfig => {
     ratedKw: config.defaults.publicEvKw,
   }));
 
-  return {
+  const neighborhoodConfig: NeighborhoodConfig = {
     seed: config.seed,
     houseCount: config.houseCount,
     publicChargerCount: config.publicChargerCount,
@@ -175,4 +175,22 @@ export const generateNeighborhoodConfig = (): NeighborhoodConfig => {
     households,
     publicChargers,
   };
+
+  persistNeighborhoodConfig(neighborhoodConfig);
+
+  return neighborhoodConfig;
+};
+
+const persistNeighborhoodConfig = (config: NeighborhoodConfig): void => {
+  const outputDir = join(process.cwd(), 'apps/backend/output');
+  mkdirSync(outputDir, { recursive: true });
+
+  const filename = `neighborhood-${Date.now()}.json`;
+  const filePath = join(outputDir, filename);
+  const payload = {
+    generatedAtIso: new Date().toISOString(),
+    config,
+  };
+
+  writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
 };
