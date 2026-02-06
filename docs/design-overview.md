@@ -22,11 +22,11 @@
 - PV usage/export: PV offsets household load first; surplus exports to grid.
 - Heat pump model: consumption scales with deterministic temperature; colder weather increases load.
 - Weather/season: deterministic, month-based seasons with a smooth temperature curve; irradiance is derived from season/temperature.
-- Neighborhood configuration: deterministic seeded allocation of assets; exactly 30 houses and 6 public chargers.
+- Neighborhood configuration: deterministic seeded allocation of assets.
+- Neighborhood configuration is editable (seed, counts, distribution, battery).
 - Public charger capacity can vary deterministically per charger.
 
 ## Known limitations
-- No tariff modeling, demand response, or policy optimization.
 - Battery control is rule-based (threshold + charge band), not optimized.
 - No tariff modeling, demand response, or policy optimization.
 - No persistence for simulation runs; results are computed in-memory.

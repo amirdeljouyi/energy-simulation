@@ -33,7 +33,7 @@
 
 ## Neighborhood configuration
 - A JSON configuration file defines a fixed seed, counts, and asset distribution.
-- The system generates exactly 30 houses and 6 public chargers using the seed.
+- House and public charger counts are configurable via the configuration API.
 - Assets are distributed deterministically across houses according to the configured shares.
 - Configuration file: `apps/backend/src/config/neighborhood.config.json`.
 - Default distribution: 40% PV, 30% heat pumps, 20% home EV chargers.
