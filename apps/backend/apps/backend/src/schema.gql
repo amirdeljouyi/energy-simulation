@@ -22,8 +22,8 @@ type HouseholdEnergyResult {
 
 type SimulationClock {
   startDateTimeIso: String!
+  endDateTimeIso: String!
   stepMinutes: Int!
-  steps: Int!
 }
 
 type AssetEnergyResult {
@@ -121,8 +121,8 @@ input SimulationInput {
 
 input SimulationClockInput {
   startDateTimeIso: String!
+  endDateTimeIso: String!
   stepMinutes: Int!
-  steps: Int!
 }
 
 input HouseholdInput {

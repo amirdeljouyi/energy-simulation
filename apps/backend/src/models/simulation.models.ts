@@ -16,11 +16,11 @@ export class SimulationClock {
   @Field()
   startDateTimeIso!: string;
 
-  @Field(() => Int)
-  stepMinutes!: number;
+  @Field()
+  endDateTimeIso!: string;
 
   @Field(() => Int)
-  steps!: number;
+  stepMinutes!: number;
 }
 
 @ObjectType()

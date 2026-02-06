@@ -32,7 +32,10 @@ export class SimulationService {
 
     const { clock, households, publicChargers } = input;
     const startTime = new Date(clock.startDateTimeIso);
+    const endTime = new Date(clock.endDateTimeIso);
     const stepHours = clock.stepMinutes / 60;
+    const stepMs = clock.stepMinutes * 60 * 1000;
+    const totalSteps = Math.round((endTime.getTime() - startTime.getTime()) / stepMs);
 
     const assetAccumulators = new Map<string, AssetAccumulator>();
     const registerAsset = (asset: AssetInput) => {
@@ -63,9 +66,9 @@ export class SimulationService {
       exportKwh: 0,
     }));
 
-    for (let stepIndex = 0; stepIndex < clock.steps; stepIndex += 1) {
+    for (let stepIndex = 0; stepIndex < totalSteps; stepIndex += 1) {
       const timestampDate = new Date(
-        startTime.getTime() + stepIndex * clock.stepMinutes * 60 * 1000,
+        startTime.getTime() + stepIndex * stepMs,
       );
       const timestampIso = timestampDate.toISOString();
       const weather = this.getWeatherSnapshot(timestampDate);
@@ -267,11 +270,23 @@ export class SimulationService {
     if (input.clock.stepMinutes <= 0) {
       throw new BadRequestException('stepMinutes must be greater than zero');
     }
-    if (input.clock.steps <= 0) {
-      throw new BadRequestException('steps must be greater than zero');
-    }
     if (Number.isNaN(Date.parse(input.clock.startDateTimeIso))) {
       throw new BadRequestException('startDateTimeIso must be a valid ISO timestamp');
+    }
+    if (Number.isNaN(Date.parse(input.clock.endDateTimeIso))) {
+      throw new BadRequestException('endDateTimeIso must be a valid ISO timestamp');
+    }
+
+    const startMs = Date.parse(input.clock.startDateTimeIso);
+    const endMs = Date.parse(input.clock.endDateTimeIso);
+    const stepMs = input.clock.stepMinutes * 60 * 1000;
+    const diffMs = endMs - startMs;
+
+    if (diffMs <= 0) {
+      throw new BadRequestException('endDateTimeIso must be after startDateTimeIso');
+    }
+    if (diffMs % stepMs !== 0) {
+      throw new BadRequestException('endDateTimeIso must align with stepMinutes');
     }
 
     input.households.forEach((household) => {
