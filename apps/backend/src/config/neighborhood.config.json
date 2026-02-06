@@ -13,5 +13,11 @@
     "heatPumpKw": 1.4,
     "homeEvKw": 3.6,
     "publicEvKw": 7.2
+  },
+  "battery": {
+    "capacityKwh": 150,
+    "maxPowerKw": 60,
+    "roundTripEfficiency": 0.9,
+    "thresholdKw": 120
   }
 }
